@@ -264,6 +264,59 @@ A client-side "payment succeeded" callback can be spoofed. <code>verifyPayment</
 Once a booking hits <code>RESERVED</code>, its inventory is locked (<code>reservedCount</code> incremented) so no one else can book it — even before payment. Without an expiry, an abandoned checkout would hold that inventory hostage indefinitely. The 10-minute TTL (<code>hasBookingExpired</code>) bounds that window.
 </details>
 
+<details>
+<summary><strong>Why access token + refresh token instead of one long-lived JWT?</strong></summary>
+<br/>
+The access token is short-lived (10 minutes) and sent in the <code>Authorization</code> header on every request — if it leaks (XSS, logs, a browser extension), the blast radius is capped at 10 minutes. The refresh token is long-lived (6 months) but never touches JavaScript at all: it's set as an <strong><code>httpOnly</code> cookie</strong> in <code>AuthController.login</code>, so client-side scripts can't read or exfiltrate it. <code>/auth/refresh</code> reads that cookie server-side and mints a new access token. This is the standard pattern for balancing "don't make users log in constantly" against "don't give a stolen token unlimited lifetime."
+</details>
+
+<details>
+<summary><strong>How does role-based access control (RBAC) actually get enforced?</strong></summary>
+<br/>
+Two layers, not one:
+
+1. <strong>Coarse-grained, at the URL level</strong> — <code>WebSecurityConfig</code> maps URL patterns to roles: <code>/admin/**</code> requires <code>HOTEL_MANAGER</code>, <code>/bookings/**</code> and <code>/users/**</code> require any authenticated user, everything else is public. This runs in the Spring Security filter chain, before a request ever reaches a controller.
+2. <strong>Fine-grained, at the method level</strong> — <code>@PreAuthorize("hasRole('HOTEL_MANAGER')")</code> on controllers like <code>HotelController</code> and <code>RoomAdminController</code>, enabled via <code>@EnableMethodSecurity</code>. This is what lets role checks live next to the business logic they protect instead of only in one central config file.
+
+The role itself is embedded in the JWT as a claim at login time (<code>JWTService.generateAccessToken</code>) and re-derived from the DB on every request via <code>JWTAuthFilter</code> → <code>user.getAuthorities()</code> — so a role change takes effect on the user's *next* request, not retroactively on an already-issued token.
+
+<em>Where this currently falls short:</em> role checks confirm <strong>who</strong> you are, not <strong>which resource</strong> you're allowed to touch — see <a href="#-known-limitations">Known Limitations</a> for the ownership-check gap on some admin endpoints.
+</details>
+
+<details>
+<summary><strong>Why DTOs instead of returning JPA entities directly from controllers?</strong></summary>
+<br/>
+Every controller talks in <code>DTO</code> types (<code>HotelDTO</code>, <code>BookingDTO</code>, <code>UserDTO</code>...), mapped from entities via <code>ModelMapper</code> — the entities themselves never leave the service layer. This buys three things concretely:
+
+- <strong>No accidental leaks.</strong> <code>User</code> carries a password hash; <code>UserDTO</code> doesn't. If a JPA entity were serialized straight to JSON, one missing <code>@JsonIgnore</code> would leak it.
+- <strong>No lazy-loading crashes.</strong> Hibernate entities carry lazy-loaded collections (<code>Hotel.rooms</code>, <code>Booking.guests</code>) that throw <code>LazyInitializationException</code> if touched outside a transaction — which serializing straight to JSON does. DTOs are plain data, so this can't happen.
+- <strong>API shape can diverge from DB shape.</strong> <code>HotelPriceResponseDTO</code> bolts a computed <code>price</code> field onto hotel data that doesn't exist as a column anywhere — it's a query-time projection, not a database attribute. Entities can't represent that cleanly; DTOs can.
+</details>
+
+<details>
+<summary><strong>Why centralized exception handling instead of try/catch in every controller?</strong></summary>
+<br/>
+<code>GlobalExceptionHandler</code> (via <code>@RestControllerAdvice</code>) catches domain exceptions — <code>ResourceNotFoundException</code>, <code>UnAuthorisedException</code>, <code>IllegalStateException</code>, JWT failures — in one place and turns them into a consistent <code>ApiError</code> response shape. Combined with <code>GlobalResponseHandler</code>, every successful response also gets wrapped in the same envelope (<code>{ data, timeStamp, error }</code>) regardless of which controller produced it. Two payoffs: controllers stay focused on orchestration instead of error formatting, and the frontend's <code>api.js</code> can unwrap every response the same way (<code>json.data ?? json</code>) without knowing which endpoint it called.
+</details>
+
+<details>
+<summary><strong>Why does the webhook handler duplicate the confirm/fail logic that verifyPayment already does?</strong></summary>
+<br/>
+Because the two entry points cover different failure modes, not the same one. <code>verifyPayment</code> runs when the <em>user's browser</em> calls back after Razorpay's checkout — but that call can simply never happen (tab closed, network drop, app crashed mid-flow). The <code>/webhooks/razorpay</code> endpoint is Razorpay's own server calling <em>your</em> server directly, independent of whether the user's browser is even still open. Both paths converge on the same <code>confirmPaymentFromWebhook</code> method, and that method is written to be safe to call twice — it checks <code>if (booking.getBookingStatus() != BookingStatus.CONFIRMED)</code> before mutating inventory, so a booking already confirmed by the browser callback doesn't get double-processed when the webhook arrives moments later.
+</details>
+
+<details>
+<summary><strong>Why does refunding check for "authorized" status separately from "captured"?</strong></summary>
+<br/>
+Razorpay payments can sit in an <code>authorized</code> state — money is reserved on the card but not yet pulled — before being <code>captured</code>. You can't refund money that was never captured. So <code>PaymentService.refundPayment</code> checks the live status from Razorpay first: if it's only <code>authorized</code>, it explicitly calls <code>payments.capture(...)</code> before issuing the refund, rather than assuming every confirmed booking already has captured funds sitting behind it.
+</details>
+
+<details>
+<summary><strong>Why is Guest a separate entity from the booking user?</strong></summary>
+<br/>
+The person paying for a booking (<code>User</code>, authenticated via JWT) isn't necessarily the person staying in the room. <code>Booking</code> holds a <code>Set&lt;Guest&gt;</code> precisely so one logged-in user can book a room for multiple named guests — each with their own name/age/gender/ID details — without needing every guest to have an account. <code>UserController</code> also exposes a standalone guest address-book (<code>/users/guests</code>) so a user can save guest profiles once and reuse them across bookings instead of re-entering details every time.
+</details>
+
 <br/>
 
 ## 🚀 Getting Started
