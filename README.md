@@ -23,10 +23,14 @@ Not another CRUD-with-JWT clone.
 [Overview](#-overview) •
 [Features](#-features) •
 [Architecture](#-architecture) •
+[Data Model](#-data-model) •
 [Tech Stack](#-tech-stack) •
+[Design Decisions](#-design-decisions-worth-knowing-about) •
 [Getting Started](#-getting-started) •
 [API Reference](#-api-reference) •
-[Design Decisions](#-design-decisions)
+[Project Structure](#-project-structure) •
+[Known Limitations](#-known-limitations) •
+[Roadmap](#-roadmap)
 
 </div>
 
@@ -86,6 +90,28 @@ It's built to reason about the domain properly — concurrency, payment trust bo
 | **Webhooks** | `payment.captured`, `payment.authorized`, `payment.failed`, `refund.processed` — all signature-verified |
 | **Failure tracking** | Dual-path: client-reported failures *and* a webhook backstop if the client never calls back |
 | **Refunds** | Full Razorpay refund flow with capture-then-refund fallback for authorized-but-uncaptured payments |
+
+### 💰 How dynamic pricing actually stacks
+
+Each night's price starts at the room's base rate and passes through four independent multipliers, applied in order:
+
+```
+Base Price (₹2,000)
+   │
+   ▼  Surge Factor (manager-set, e.g. 1.0×)
+₹2,000
+   │
+   ▼  Occupancy > 80% booked for that night → ×1.2
+₹2,400
+   │
+   ▼  Check-in within next 7 days → ×1.15
+₹2,760
+   │
+   ▼  Weekend or public holiday → ×1.25
+₹3,450  ← final price for that night
+```
+
+Because each step is a self-contained `PricingStrategy` decorator, this recalculates fresh every time inventory state changes (a booking, a cancellation, a manager override) — not once at room-creation time. The price you see when searching is the price you'll actually be charged.
 
 <br/>
 
@@ -150,6 +176,30 @@ It's built to reason about the domain properly — concurrency, payment trust bo
                                                                       │  confirmed)   │
                                                                       └──────────────┘
 ```
+
+<br/>
+
+## 🗃 Data Model
+
+```
+User ──┬──< Hotel (owner)
+       ├──< Booking >── Hotel
+       ├──< Guest
+       └──< Payment  (via Booking)
+
+Hotel ──< Room ──< Inventory (one row per room, per night)
+Hotel ──< HotelContactInfo
+Hotel ──< Booking
+
+Booking ──< Guest (many-to-many: guests attached to a booking)
+Booking ── Payment  (one active payment record per booking)
+
+Inventory: { date, totalCount, bookedCount, reservedCount, closed, surgeFactor, price }
+```
+
+**Why inventory is modeled per room *per night*, not per room:** availability and price both vary by date (weekends, holidays, how full that specific night already is). A single `Room` row can't represent that — so `Inventory` denormalizes into one row per room per calendar day, which is also what makes the pessimistic-lock query on a date range possible in a single `SELECT ... FOR UPDATE`.
+
+**Core entities:** `User`, `Hotel`, `Room`, `Inventory`, `Booking`, `Guest`, `Payment` — plus enums for `Role` (`GUEST` / `HOTEL_MANAGER`), `BookingStatus`, and `PaymentStatus`.
 
 <br/>
 
@@ -267,6 +317,20 @@ npm run dev
 
 The app will be live at `http://localhost:5173`.
 
+### Environment variables reference
+
+| Variable | Purpose | Example |
+|---|---|---|
+| `spring.datasource.url` | MySQL connection string | `jdbc:mysql://localhost:3306/staybook` |
+| `spring.datasource.username` / `.password` | DB credentials | — |
+| `jwt.secretKey` | HMAC signing key for access & refresh tokens | a long random string, 256-bit+ |
+| `razorpay.key.id` / `.key.secret` | Razorpay API credentials | from your Razorpay dashboard |
+| `razorpay.webhook.secret` | Verifies inbound webhook signatures | set when configuring the webhook in Razorpay |
+| `razorpay.currency` | Defaults to `INR` | — |
+| `server.port` | Backend port | `8089` |
+
+> No Razorpay account handy? Leave the keys blank — `CheckoutServiceImpl` catches the failure and falls back to a mock order (`order_mock_...`) so the booking flow still works end-to-end for local testing.
+
 <br/>
 
 ## 📡 API Reference
@@ -335,6 +399,63 @@ The app will be live at `http://localhost:5173`.
 
 <br/>
 
+## 📂 Project Structure
+
+```
+Staybook/
+├── src/main/java/com/logic/
+│   ├── controller/        # REST endpoints — thin, delegate to services
+│   ├── Service/            # Business logic (booking, pricing, payments, hotels, rooms)
+│   ├── Repository/         # Spring Data JPA + custom @Query / @Lock methods
+│   ├── entity/              # JPA entities + enums (BookingStatus, PaymentStatus, Role)
+│   ├── DTO/                  # Request/response contracts, kept separate from entities
+│   ├── strategy/              # Pricing decorators (Base/Surge/Occupancy/Urgency/Holiday)
+│   ├── security/                # JWT filter, JWT service, Spring Security config, AuthService
+│   ├── advice/                    # Global exception handling + response envelope
+│   ├── config/                     # CORS, Razorpay client, ModelMapper beans
+│   ├── exception/                    # Domain exceptions (ResourceNotFound, Unauthorised)
+│   └── utils/                          # Shared helpers (current-user accessor, etc.)
+│
+├── src/main/resources/
+│   └── application.properties          # ⚠ move secrets to a gitignored local file
+│
+├── src/test/java/                        # Spring Boot test scaffold
+│
+└── airhouse-frontend/
+    └── src/
+        ├── views/            # HotelSearch, HotelDetails, Checkout, MyBookings,
+        │                        Profile, ManagerDashboard
+        ├── components/       # Navbar, Footer, AuthModal
+        ├── context/          # AuthContext (JWT state)
+        └── api.js             # Single fetch client wrapping every backend route
+```
+
+<br/>
+
+## 🧪 Testing
+
+The domain logic here — locking, pricing math, payment amount verification, refund fallbacks — is exactly the kind of thing unit tests are built for, and that's the honest gap in the project right now: only the default Spring Boot context-load test exists. Priority order for adding coverage:
+
+1. `PricingService` — deterministic, no I/O, easiest to test first (given a fixed `Inventory`, assert the exact final price for surge/weekend/urgency combinations).
+2. `BookServiceImpl.validateRazorpayPayment` — mock the Razorpay client and assert amount/status mismatches are rejected.
+3. Concurrency test for `findAndLockAvailableInventory` — fire two overlapping booking requests at the same room/date range and assert only one succeeds.
+
+<br/>
+
+## ⚠ Known Limitations
+
+Being upfront about where this stands today rather than overstating it:
+
+- **Manager endpoints check role, not ownership** on some hotel/room mutation paths — a `HOTEL_MANAGER` can currently act on hotels they don't own. Booking/report endpoints already enforce this correctly (`hotel.getOwner().equals(currentUser)`); the fix is bringing the rest of the admin endpoints up to the same standard.
+- **Secrets currently live in `application.properties`** rather than environment variables — fine for local dev, not something to commit as-is.
+- **Invoices are plain-text**, not PDF — functional, but not the polish a real receipt would have.
+- **No automated tests beyond the Spring Boot scaffold** (see [Testing](#-testing) above).
+- **CORS allows the `"null"` origin**, which is broader than it needs to be for a browser-only frontend.
+
+None of these block the app from working end-to-end locally — they're the next things to fix before treating this as anything beyond a learning project.
+
+<br/>
+
 ## 🗺 Roadmap
 
 - [ ] Email notifications on booking confirmation
@@ -344,13 +465,28 @@ The app will be live at `http://localhost:5173`.
 - [ ] Redis caching for hotel search
 - [ ] CI/CD pipeline
 - [ ] Dockerized deployment
+- [ ] Owner-scoped authorization on remaining admin endpoints
+- [ ] Unit test coverage for pricing & payment verification
+- [ ] Secrets moved to environment variables
+
+<br/>
+
+## 🤝 Contributing
+
+This started as a learning project, but issues, suggestions, and PRs are genuinely welcome — especially around the items in [Known Limitations](#-known-limitations). If you spot something, open an issue before a PR so we're aligned on approach.
+
+<br/>
+
+## 📄 License
+
+Licensed under the [MIT License](LICENSE).
 
 <br/>
 
 ## 👨‍💻 Author
 
 **Sujal Saini**
- B.Tech, Computer Science & Engineering graduate 2026
+Final Year B.Tech, Computer Science Engineering
 Backend Developer — Java · Spring Boot · MySQL
 
 [GitHub](https://github.com/Sujals246)
