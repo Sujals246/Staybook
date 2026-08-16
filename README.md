@@ -1,692 +1,263 @@
 <div align="center">
 
-# 🏨 StayBook
+# 🏨 Staybook
 
-### Full-Stack Hotel Booking Platform
+### A hotel booking & payments platform built with Spring Boot and React
 
-A full-stack hotel booking platform built with **Java, Spring Boot, React, MySQL & Razorpay**, featuring secure authentication, transactional booking workflows, concurrency-safe inventory management, dynamic pricing, and online payments.
-
-<br/>
-
-**Java** · **Spring Boot** · **Spring Security** · **React** · **MySQL** · **Hibernate** · **Razorpay**
+Real inventory locking. Real payment verification. Real dynamic pricing.
+Not another CRUD-with-JWT clone.
 
 <br/>
 
-[Features](#-features) · [Architecture](#-architecture) · [Booking Flow](#-booking-flow) · [Getting Started](#-getting-started) · [API](#-api-overview)
+![Java](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![MySQL](https://img.shields.io/badge/MySQL-8-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
+![Razorpay](https://img.shields.io/badge/Razorpay-Payments-0C47C9?style=for-the-badge&logo=razorpay&logoColor=white)
+![JWT](https://img.shields.io/badge/Auth-JWT-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white)
+
+![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)
+![Status](https://img.shields.io/badge/Status-Active%20Development-brightgreen?style=flat-square)
+![PRs](https://img.shields.io/badge/PRs-Welcome-orange?style=flat-square)
+
+[Overview](#-overview) •
+[Features](#-features) •
+[Architecture](#-architecture) •
+[Tech Stack](#-tech-stack) •
+[Getting Started](#-getting-started) •
+[API Reference](#-api-reference) •
+[Design Decisions](#-design-decisions)
 
 </div>
 
----
+<br/>
 
-## ✨ Overview
+## 📖 Overview
 
-**StayBook** is a full-stack hotel reservation system designed around real-world booking and payment workflows rather than simple CRUD operations.
+**Staybook** is a full-stack, Airbnb-style booking system that goes past the surface-level "list hotels, take a booking" demo and actually handles the hard parts of the domain:
 
-The application allows users to:
+- **Concurrency-safe inventory** — pessimistic row locking so two guests can't book the last room at the same time.
+- **Trustless payment verification** — every payment is re-verified against Razorpay's API (order, status, amount) instead of trusting whatever the client reports.
+- **Composable dynamic pricing** — surge, occupancy, urgency, and holiday pricing stack on top of a base rate using the Decorator pattern.
+- **A real booking lifecycle** — `RESERVED → GUESTS_ADDED → PAYMENTS_PENDING → CONFIRMED / CANCELLED`, with automatic expiry on abandoned bookings.
 
-* Search hotels and check room availability
-* View hotel and room information
-* Create and manage bookings
-* Add guests to reservations
-* Make payments through Razorpay
-* Track booking and payment status
-* Cancel bookings and process refunds
-* Download payment receipts
+It's built to reason about the domain properly — concurrency, payment trust boundaries, and pricing rules — rather than stopping at the happy path.
 
-Hotel managers can manage their properties, rooms, inventory, pricing, bookings, and revenue reports through a dedicated dashboard.
+<br/>
 
-The backend is built as a **layered Spring Boot application** with REST APIs, Spring Security, JWT authentication, JPA/Hibernate, transactional service methods, and MySQL persistence.
-
----
-
-# 🚀 Features
+## ✨ Features
 
 <table>
 <tr>
-<td width="50%">
+<td width="50%" valign="top">
 
-### 🔐 Authentication & Security
-
-* JWT-based authentication
-* Refresh-token support
-* BCrypt password hashing
-* Role-based authorization
-* Protected REST APIs
-* Stateless Spring Security
-
-</td>
-<td width="50%">
-
-### 🏨 Hotel Management
-
-* Hotel creation & management
-* Room type management
-* Hotel activation
-* Room inventory management
-* Manager dashboard
-* Revenue reporting
+### 👤 Guest Experience
+- Secure signup & login (JWT + refresh token)
+- Browse & search hotels by city, dates, room count
+- Real-time room availability
+- Multi-day booking with per-day dynamic pricing
+- Razorpay checkout with signature-verified confirmation
+- Booking history & live status tracking
+- Downloadable payment receipts
+- Cancel & auto-refund confirmed bookings
 
 </td>
-</tr>
+<td width="50%" valign="top">
 
-<tr>
-<td>
-
-### 📅 Booking System
-
-* Hotel search
-* Date-based availability
-* Room selection
-* Guest management
-* Booking state management
-* Booking cancellation
-* Booking history
-
-</td>
-<td>
-
-### 💳 Payments
-
-* Razorpay integration
-* Order creation
-* Server-side verification
-* Payment status tracking
-* Webhooks
-* Failed payments
-* Refunds
-* Payment receipts
-
-</td>
-</tr>
-
-<tr>
-<td>
-
-### 📦 Inventory & Concurrency
-
-* Date-wise inventory
-* Reserved inventory
-* Booked inventory
-* Transactional updates
-* Pessimistic locking
-* Concurrent booking protection
-
-</td>
-<td>
-
-### 💰 Dynamic Pricing
-
-* Base pricing
-* Surge pricing
-* Occupancy pricing
-* Booking urgency pricing
-* Holiday pricing
-* Weekend pricing
-* Strategy Pattern
+### 🏢 Hotel Manager Experience
+- Create, update, activate, and deactivate hotels
+- Manage rooms and yearlong inventory in one call
+- Fine-grained inventory control — surge factor & date-range closures
+- Revenue reports scoped to date ranges
+- View all bookings for owned properties
+- Role-based access (`HOTEL_MANAGER` vs `GUEST`)
 
 </td>
 </tr>
 </table>
 
----
+### 💳 Payments, Done Properly
 
-# 🧠 What Makes StayBook Different?
+| Capability | How it's handled |
+|---|---|
+| **Order creation** | Server creates the Razorpay order — amount is never trusted from the client |
+| **Signature verification** | HMAC-SHA256, constant-time comparison (no timing attacks) |
+| **Payment verification** | Re-fetched from Razorpay's API and cross-checked on `order_id`, `status`, **and amount** |
+| **Webhooks** | `payment.captured`, `payment.authorized`, `payment.failed`, `refund.processed` — all signature-verified |
+| **Failure tracking** | Dual-path: client-reported failures *and* a webhook backstop if the client never calls back |
+| **Refunds** | Full Razorpay refund flow with capture-then-refund fallback for authorized-but-uncaptured payments |
 
-The project goes beyond a basic hotel CRUD application.
+<br/>
 
-### Concurrency-aware booking
+## 🏗 Architecture
 
-The inventory system uses **pessimistic database locking** during critical booking operations to reduce race conditions and prevent concurrent overbooking.
-
-### Transactional booking workflow
-
-Booking, inventory, payment, and confirmation operations are handled through transactional service logic to maintain consistency across related database operations.
-
-### Composable pricing engine
-
-Pricing rules are implemented using the **Strategy Pattern**, allowing multiple pricing factors to be composed instead of putting every condition into one large method.
-
-### Real payment lifecycle
-
-The payment system handles more than just a successful checkout:
-
-```text
-Order Creation
-      ↓
-Payment
-      ↓
-Signature Verification
-      ↓
-Server-side Validation
-      ↓
-Booking Confirmation
+```
+                        ┌─────────────────────┐
+                        │   React Frontend     │
+                        │   (Vite + React 19)  │
+                        └──────────┬───────────┘
+                                   │ REST / JSON
+                                   ▼
+                        ┌─────────────────────┐
+                        │  JWT Auth Filter      │
+                        │  (Spring Security)    │
+                        └──────────┬───────────┘
+                                   │
+        ┌──────────────┬──────────┴──────────┬──────────────┐
+        ▼              ▼                     ▼              ▼
+   Auth Module    Hotel/Room Module    Booking Module   Payment Module
+        │              │                     │              │
+        │              │                     ▼              │
+        │              │            Pricing Engine           │
+        │              │         (Decorator Pattern)          │
+        │              │           Base → Surge →              │
+        │              │        Occupancy → Urgency →           │
+        │              │              Holiday                    │
+        │              │                     │              │
+        └──────────────┴──────────┬──────────┴──────────────┘
+                                   ▼
+                        ┌─────────────────────┐
+                        │   MySQL (Hibernate)   │
+                        │  Pessimistic Locking   │
+                        │   on Inventory rows    │
+                        └──────────┬───────────┘
+                                   │
+                                   ▼
+                        ┌─────────────────────┐
+                        │   Razorpay Gateway    │
+                        │  Orders · Webhooks ·   │
+                        │      Refunds            │
+                        └─────────────────────┘
 ```
 
-It also handles:
+### The booking lifecycle
 
-```text
-Failed Payment
-Refund
-Webhook Events
-Payment State Updates
+```
+  init booking            add guests           pay & verify           confirmed
+┌──────────────┐       ┌──────────────┐      ┌──────────────┐      ┌──────────────┐
+│   RESERVED    │──────▶│ GUESTS_ADDED  │─────▶│PAYMENTS_PENDING│─────▶│  CONFIRMED    │
+│ inventory     │       │               │      │ Razorpay order │      │ inventory     │
+│ locked +      │       │               │      │ created        │      │ booked,       │
+│ reserved      │       │               │      │                 │      │ reservation   │
+│ (10 min TTL)  │       │               │      │                 │      │ released      │
+└──────────────┘       └──────────────┘      └──────────────┘      └──────────────┘
+        │                                                                    │
+        └─────────────────── expires / cancelled ──────────────────────────▶│
+                                                                              ▼
+                                                                      ┌──────────────┐
+                                                                      │  CANCELLED    │
+                                                                      │ (refunded if  │
+                                                                      │  confirmed)   │
+                                                                      └──────────────┘
 ```
 
----
-
-# 🏗️ Architecture
-
-```mermaid
-flowchart LR
-
-    A[React Frontend] --> B[REST API]
-
-    B --> C[Controller Layer]
-
-    C --> D[Service Layer]
-
-    D --> E[Repository Layer]
-
-    E --> F[(MySQL)]
-
-    D --> G[Spring Security]
-    D --> H[Razorpay]
-    D --> I[Pricing Strategy Engine]
-```
-
-### Backend Structure
-
-```text
-Controller
-    ↓
-Service
-    ↓
-Repository
-    ↓
-JPA / Hibernate
-    ↓
-MySQL
-```
-
-Supporting components:
-
-```text
-DTOs
-Security
-JWT
-Exception Handling
-Pricing Strategies
-Configuration
-Utilities
-```
-
----
-
-# 📅 Booking Flow
-
-StayBook uses a multi-step booking workflow.
-
-```mermaid
-flowchart TD
-
-    A[Search Hotel] --> B[Check Availability]
-    B --> C[Select Room]
-    C --> D[Initialize Booking]
-    D --> E[Reserve Inventory]
-    E --> F[Add Guests]
-    F --> G[Create Razorpay Order]
-    G --> H[Complete Payment]
-    H --> I[Verify Payment]
-    I --> J[Confirm Booking]
-```
-
-### Booking States
-
-```text
-RESERVED
-    ↓
-GUESTS_ADDED
-    ↓
-PAYMENTS_PENDING
-    ↓
-CONFIRMED
-```
-
-Alternative states:
-
-```text
-CANCELLED
-EXPIRED
-```
-
----
-
-# 🔒 Inventory & Concurrency
-
-Inventory is maintained using separate counters:
-
-```text
-Total Inventory
-      │
-      ├── Reserved Rooms
-      │
-      └── Booked Rooms
-```
-
-### During reservation
-
-```text
-reservedCount += requestedRooms
-```
-
-### After successful payment
-
-```text
-reservedCount -= requestedRooms
-bookedCount   += requestedRooms
-```
-
-### Cancellation before confirmation
-
-```text
-reservedCount -= requestedRooms
-```
-
-### Cancellation after confirmation
-
-```text
-bookedCount -= requestedRooms
-```
-
-Critical inventory operations use **transactional service methods and pessimistic locking** to protect against concurrent booking conflicts.
-
----
-
-# 💰 Dynamic Pricing Engine
-
-StayBook uses a composable pricing strategy:
-
-```mermaid
-flowchart LR
-
-    A[Base Price]
-    --> B[Surge Pricing]
-    --> C[Occupancy Pricing]
-    --> D[Urgency Pricing]
-    --> E[Holiday / Weekend Pricing]
-    --> F[Final Room Price]
-```
-
-### Pricing Factors
-
-| Strategy          | Description                          |
-| ----------------- | ------------------------------------ |
-| Base Pricing      | Room's configured base price         |
-| Surge Pricing     | Applies configurable surge factors   |
-| Occupancy Pricing | Adjusts price based on occupancy     |
-| Urgency Pricing   | Adjusts price for near-term bookings |
-| Holiday Pricing   | Handles configured holidays          |
-| Weekend Pricing   | Applies weekend pricing rules        |
-
-The pricing implementation uses the **Strategy Pattern** so individual pricing rules remain independently composable.
-
----
-
-# 💳 Payment System
-
-StayBook integrates **Razorpay** for online payments.
-
-### Payment Lifecycle
-
-```mermaid
-sequenceDiagram
-
-    participant U as User
-    participant S as StayBook
-    participant R as Razorpay
-
-    U->>S: Initialize Booking
-    S->>S: Reserve Inventory
-    S->>R: Create Payment Order
-    R-->>U: Checkout
-    U->>R: Complete Payment
-    R-->>U: Payment Response
-    U->>S: Verify Payment
-    S->>R: Validate Payment
-    R-->>S: Payment Status
-    S->>S: Confirm Booking
-    S->>S: Update Inventory
-```
-
-### Payment Features
-
-* Razorpay order creation
-* Payment signature verification
-* Server-side payment validation
-* Payment state tracking
-* Failed-payment handling
-* Razorpay webhooks
-* Refund processing
-* Refund webhook handling
-* Booking confirmation
-* Downloadable payment receipts
-
-### Payment States
-
-```text
-PENDING
-CONFIRMED
-FAILED
-CANCELLED
-REFUNDED
-```
-
-### Webhook Endpoint
-
-```text
-POST /api/v1/webhooks/razorpay
-```
-
-Handled events include:
-
-```text
-payment.captured
-payment.authorized
-payment.failed
-refund.processed
-```
-
----
-
-# 🔐 Authentication & Authorization
-
-Authentication is implemented using **Spring Security + JWT**.
-
-```mermaid
-flowchart LR
-
-    A[Login] --> B[AuthenticationManager]
-    B --> C[Credentials Validated]
-    C --> D[Access Token + Refresh Token]
-    D --> E[Client]
-    E --> F[Bearer Token]
-    F --> G[JWT Filter]
-    G --> H[Protected API]
-```
-
-### Security Components
-
-* JWT access tokens
-* Refresh tokens
-* BCrypt password hashing
-* Spring Security filters
-* Role-based authorization
-* Protected REST endpoints
-
-### Roles
-
-```text
-GUEST
-HOTEL_MANAGER
-```
-
----
-
-# 📊 Manager Dashboard
-
-Hotel managers have access to management functionality for their properties.
-
-### Hotel Operations
-
-* Create hotels
-* Update hotel details
-* Delete hotels
-* Activate hotels
-* View managed hotels
-
-### Room Operations
-
-* Create rooms
-* View rooms
-* Delete rooms
-* Configure room pricing
-* Manage inventory
-
-### Business Operations
-
-* View bookings
-* Manage pricing
-* Generate revenue reports
-* Monitor booking activity
-
----
-
-# 📈 Revenue Reporting
-
-The application provides hotel-level revenue reporting over a selected date range.
-
-Reports include:
-
-* Confirmed bookings
-* Confirmed booking revenue
-* Average revenue per confirmed booking
-
----
-
-# 🗄️ Domain Model
-
-```mermaid
-erDiagram
-
-    USER ||--o{ BOOKING : creates
-    USER ||--o{ GUEST : manages
-
-    HOTEL ||--o{ ROOM : contains
-    ROOM ||--o{ INVENTORY : has
-
-    BOOKING }o--|| HOTEL : belongs_to
-    BOOKING }o--|| ROOM : reserves
-    BOOKING ||--o{ GUEST : includes
-    BOOKING ||--o| PAYMENT : has
-
-    HOTEL ||--o{ ROOM : provides
-```
-
-### Core Entities
-
-```text
-User
-Hotel
-Room
-Inventory
-Booking
-Guest
-Payment
-HotelMinPrice
-```
-
----
-
-# 🧩 Design & Engineering Concepts
-
-StayBook demonstrates:
-
-| Concept                | Implementation                    |
-| ---------------------- | --------------------------------- |
-| Layered Architecture   | Controller → Service → Repository |
-| DTO Pattern            | API/service data transfer         |
-| Strategy Pattern       | Dynamic pricing                   |
-| Dependency Injection   | Spring IoC                        |
-| Repository Pattern     | Spring Data JPA                   |
-| Transaction Management | `@Transactional`                  |
-| Pessimistic Locking    | Concurrent inventory protection   |
-| JWT Authentication     | Stateless authentication          |
-| RBAC                   | Guest / Hotel Manager             |
-| Centralized Exceptions | Global exception handling         |
-| ORM                    | Hibernate / JPA                   |
-
----
-
-# 📁 Project Structure
-
-```text
-StayBook/
-│
-├── src/
-│   ├── main/
-│   │   ├── java/
-│   │   │   └── com/logic/
-│   │   │       ├── DTO/
-│   │   │       ├── Repository/
-│   │   │       ├── Service/
-│   │   │       ├── advice/
-│   │   │       ├── config/
-│   │   │       ├── controller/
-│   │   │       ├── entity/
-│   │   │       ├── exception/
-│   │   │       ├── security/
-│   │   │       ├── strategy/
-│   │   │       └── utils/
-│   │   │
-│   │   └── resources/
-│   │       └── application.properties
-│   │
-│   └── test/
-│
-├── airhouse-frontend/
-│   ├── src/
-│   │   ├── assets/
-│   │   ├── components/
-│   │   ├── context/
-│   │   ├── views/
-│   │   ├── api.js
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│   │
-│   ├── package.json
-│   └── vite.config.js
-│
-├── pom.xml
-└── README.md
-```
-
----
-
-# 🛠️ Tech Stack
-
-### Backend
-
-`Java 17` · `Spring Boot` · `Spring MVC` · `Spring Security` · `Spring Data JPA` · `Hibernate` · `JJWT` · `ModelMapper` · `Maven`
-
-### Frontend
-
-`React 19` · `JavaScript` · `Vite` · `HTML` · `CSS` · `Fetch API`
-
-### Database
-
-`MySQL`
-
-### Payment
-
-`Razorpay`
-
-### API & Development
-
-`REST APIs` · `Swagger / OpenAPI` · `Git` · `GitHub` · `Postman` · `IntelliJ IDEA` · `VS Code`
-
----
-
-# ⚡ Getting Started
-
-## Prerequisites
-
-Install:
-
-* Java 17+
-* Maven
-* Node.js & npm
-* MySQL
-* Razorpay test credentials
-
----
-
-## 1. Clone
+<br/>
+
+## ⚙ Tech Stack
+
+<table>
+<tr>
+<th>Layer</th>
+<th>Technology</th>
+</tr>
+<tr>
+<td><strong>Backend</strong></td>
+<td>Java 17 · Spring Boot 4 · Spring Security · Spring Data JPA (Hibernate) · JJWT</td>
+</tr>
+<tr>
+<td><strong>Frontend</strong></td>
+<td>React 19 · Vite · Axios-style fetch client · lucide-react</td>
+</tr>
+<tr>
+<td><strong>Database</strong></td>
+<td>MySQL 8 with pessimistic write locks for concurrency safety</td>
+</tr>
+<tr>
+<td><strong>Payments</strong></td>
+<td>Razorpay (Orders API, Payments API, Refunds API, Webhooks)</td>
+</tr>
+<tr>
+<td><strong>API Docs</strong></td>
+<td>springdoc-openapi (Swagger UI)</td>
+</tr>
+<tr>
+<td><strong>Build Tools</strong></td>
+<td>Maven · npm</td>
+</tr>
+</table>
+
+<br/>
+
+## 🎯 Design Decisions Worth Knowing About
+
+<details>
+<summary><strong>Why pessimistic locking instead of optimistic?</strong></summary>
+<br/>
+Inventory rows are the contention point during high-traffic booking windows. A pessimistic <code>PESSIMISTIC_WRITE</code> lock on <code>findAndLockAvailableInventory</code> guarantees that two concurrent requests for the same room/date range can never both succeed — one blocks until the other's transaction commits or rolls back. Optimistic locking would need a retry loop on every booking attempt during contention, which is worse UX for a use case where failed bookings should be rare, not routine.
+</details>
+
+<details>
+<summary><strong>Why a Decorator pattern for pricing?</strong></summary>
+<br/>
+Surge, occupancy, urgency, and holiday pricing are independent, composable rules that each multiply the running price. Wrapping <code>PricingStrategy</code> implementations around each other (<code>Base → Surge → Occupancy → Urgency → Holiday</code>) means each rule is testable in isolation and new pricing rules can be added without touching existing ones — no giant if/else pricing function.
+</details>
+
+<details>
+<summary><strong>Why re-verify payments server-side instead of trusting the client?</strong></summary>
+<br/>
+A client-side "payment succeeded" callback can be spoofed. <code>verifyPayment</code> checks the HMAC signature <em>and</em> re-fetches the payment object directly from Razorpay's API to confirm the order ID, status, and paise amount all match the booking — closing the gap where someone could report success for a payment that never happened, or for a lower amount than the room actually costs.
+</details>
+
+<details>
+<summary><strong>Why does a booking expire after 10 minutes?</strong></summary>
+<br/>
+Once a booking hits <code>RESERVED</code>, its inventory is locked (<code>reservedCount</code> incremented) so no one else can book it — even before payment. Without an expiry, an abandoned checkout would hold that inventory hostage indefinitely. The 10-minute TTL (<code>hasBookingExpired</code>) bounds that window.
+</details>
+
+<br/>
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Java 17+
+- Node.js 18+
+- MySQL 8+
+- A [Razorpay](https://razorpay.com/) test account (optional — falls back to a mock order if the API call fails)
+
+### Clone
 
 ```bash
-git clone <YOUR_REPOSITORY_URL>
-cd StayBook
+git clone https://github.com/Sujals246/Airbnb-Booking-System-.git
+cd Airbnb-Booking-System-
 ```
 
----
+### Backend setup
 
-## 2. Create Database
-
-```sql
-CREATE DATABASE airbnb_pr;
-```
-
----
-
-## 3. Configure Backend
-
-Create your local configuration with the required database, JWT, and Razorpay credentials.
-
-Example:
+Create a local MySQL database, then configure your own `src/main/resources/application-local.properties` (never commit real credentials):
 
 ```properties
-spring.application.name=StayBook
+spring.datasource.url=jdbc:mysql://localhost:3306/staybook
+spring.datasource.username=your_username
+spring.datasource.password=your_password
 
-spring.datasource.url=jdbc:mysql://localhost:3306/airbnb_pr
-spring.datasource.username=YOUR_DB_USERNAME
-spring.datasource.password=YOUR_DB_PASSWORD
+jwt.secretKey=replace-with-a-long-random-secret
 
-spring.jpa.database-platform=org.hibernate.dialect.MySQLDialect
-spring.jpa.hibernate.ddl-auto=update
-
-server.port=8089
-server.servlet.context-path=/api/v1
-
-jwt.secretKey=YOUR_JWT_SECRET
-
-razorpay.key.id=YOUR_RAZORPAY_KEY_ID
-razorpay.key.secret=YOUR_RAZORPAY_KEY_SECRET
-razorpay.currency=INR
-razorpay.business.name=StayBook
-razorpay.webhook.secret=YOUR_WEBHOOK_SECRET
+razorpay.key.id=your_razorpay_key_id
+razorpay.key.secret=your_razorpay_key_secret
+razorpay.webhook.secret=your_webhook_secret
 ```
 
-> ⚠️ **Never commit real credentials or secrets to GitHub.**
-
----
-
-## 4. Run Backend
-
-### Linux / macOS
+Run it:
 
 ```bash
+./mvnw clean install
 ./mvnw spring-boot:run
 ```
 
-### Windows
+The API will be live at `http://localhost:8089/api/v1`, with Swagger UI at `http://localhost:8089/api/v1/swagger-ui.html`.
 
-```bash
-mvnw.cmd spring-boot:run
-```
-
-Backend:
-
-```text
-http://localhost:8089
-```
-
-API base:
-
-```text
-http://localhost:8089/api/v1
-```
-
----
-
-## 5. Run Frontend
+### Frontend setup
 
 ```bash
 cd airhouse-frontend
@@ -694,175 +265,100 @@ npm install
 npm run dev
 ```
 
-Open the Vite development URL displayed in your terminal.
+The app will be live at `http://localhost:5173`.
 
----
+<br/>
 
-# 📚 API Overview
+## 📡 API Reference
 
-All APIs use:
+<details>
+<summary><strong>Authentication</strong></summary>
 
-```text
-/api/v1
-```
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/auth/signup` | Register a new guest account |
+| `POST` | `/auth/login` | Authenticate and receive access + refresh tokens |
+| `POST` | `/auth/refresh` | Exchange a refresh token for a new access token |
 
-### Authentication
+</details>
 
-```text
-POST /auth/signup
-POST /auth/login
-POST /auth/refresh
-```
+<details>
+<summary><strong>Hotels & Search</strong></summary>
 
-### Hotels
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/hotels/search` | Search available hotels by city, dates & room count |
+| `POST` | `/hotels/{hotelId}/info` | Get hotel details with room pricing for a date range |
 
-```text
-POST /hotels/search
-GET  /hotels/{hotelId}/info
-```
+</details>
 
-### Bookings
+<details>
+<summary><strong>Bookings</strong></summary>
 
-```text
-POST /bookings/init
-POST /bookings/{bookingId}/guest
-POST /bookings/{bookingId}/payments
-POST /bookings/{bookingId}/payments/verify
-POST /bookings/{bookingId}/payments/failed
-POST /bookings/{bookingId}/cancel
-GET  /bookings/{bookingId}/status
-GET  /bookings/{bookingId}/invoice
-```
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/bookings/init` | Reserve inventory & initialize a booking |
+| `POST` | `/bookings/{id}/guest` | Attach guest details to a reserved booking |
+| `POST` | `/bookings/{id}/payments` | Create a Razorpay payment order |
+| `POST` | `/bookings/{id}/payments/verify` | Verify payment & confirm booking |
+| `POST` | `/bookings/{id}/payments/failed` | Record a client-reported payment failure |
+| `POST` | `/bookings/{id}/cancel` | Cancel a booking (auto-refunds if confirmed) |
+| `GET` | `/bookings/{id}/status` | Get current booking status |
+| `GET` | `/bookings/{id}/invoice` | Download a payment receipt |
 
-### User
+</details>
 
-```text
-GET    /users/profile
-PATCH  /users/profile
-GET    /users/myBookings
-GET    /users/me/payments
-GET    /users/me/guests
-POST   /users/guests
-PUT    /users/guests/{guestId}
-DELETE /users/guests/{guestId}
-```
+<details>
+<summary><strong>Manager — Hotels, Rooms & Inventory</strong></summary>
 
-### Manager
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/admin/hotels` | Create a new hotel |
+| `PUT` | `/admin/hotels/{id}` | Update hotel details |
+| `PATCH` | `/admin/hotels/{id}` | Activate a hotel (initializes a year of inventory) |
+| `DELETE` | `/admin/hotels/{id}` | Delete a hotel |
+| `GET` | `/admin/hotels/{id}/bookings` | View all bookings for a hotel |
+| `GET` | `/admin/hotels/{id}/reports` | Revenue report for a date range |
+| `POST` | `/admin/hotels/{hotelId}/rooms` | Add a room to a hotel |
+| `PATCH` | `/admin/hotels/{hotelId}/rooms/{roomId}/inventory` | Adjust surge pricing / close dates |
 
-```text
-POST   /admin/hotels
-GET    /admin/hotels
-GET    /admin/hotels/{hotelId}
-PUT    /admin/hotels/{hotelId}
-DELETE /admin/hotels/{hotelId}
-PATCH  /admin/hotels/{hotelId}
-GET    /admin/hotels/{hotelId}/bookings
-GET    /admin/hotels/{hotelId}/reports
-```
+</details>
 
----
+<details>
+<summary><strong>Webhooks</strong></summary>
 
-# 🧪 Testing
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/webhooks/razorpay` | Signature-verified Razorpay event handler |
 
-Run the test suite with:
+</details>
 
-```bash
-./mvnw test
-```
+<br/>
 
-Windows:
+## 🗺 Roadmap
 
-```bash
-mvnw.cmd test
-```
+- [ ] Email notifications on booking confirmation
+- [ ] Google OAuth login
+- [ ] Reviews & ratings
+- [ ] Wishlist
+- [ ] Redis caching for hotel search
+- [ ] CI/CD pipeline
+- [ ] Dockerized deployment
 
-The current project contains a Spring Boot application context test. Expanding automated coverage for booking concurrency, payment verification, authorization, refunds, and pricing would be a natural next improvement.
+<br/>
 
----
+## 👨‍💻 Author
 
-# 📸 Screenshots
+**Sujal Saini**
+ B.Tech, Computer Science & Engineering graduate 2026
+Backend Developer — Java · Spring Boot · MySQL
 
-> Add actual application screenshots here once you have them.
+[GitHub](https://github.com/Sujals246)
 
-Recommended showcase:
-
-```text
-Home / Hotel Search
-        ↓
-Hotel Details
-        ↓
-Room Selection
-        ↓
-Checkout
-        ↓
-Razorpay Payment
-        ↓
-Booking Confirmation
-        ↓
-Manager Dashboard
-```
-
-A strong GitHub README should eventually include **4–6 clean screenshots**, preferably showing the complete user journey rather than random UI screens.
-
----
-
-# 🔒 Security Notes
-
-StayBook is a portfolio/learning project and should undergo additional hardening before production deployment.
-
-Before deploying publicly:
-
-* Store secrets in environment variables
-* Never commit database passwords
-* Never commit JWT secrets
-* Never commit Razorpay secrets
-* Configure HTTPS
-* Restrict CORS to trusted origins
-* Review resource-level authorization
-* Add comprehensive integration tests
-* Disable development/mock payment behavior in production
-* Configure secure production cookie settings
-
----
-
-# 🔮 Future Improvements
-
-Potential next steps:
-
-* [ ] Comprehensive unit & integration testing
-* [ ] Automated booking-expiry cleanup
-* [ ] Stronger resource-level authorization
-* [ ] Email booking notifications
-* [ ] OAuth / Google login
-* [ ] Reviews & ratings
-* [ ] Wishlist
-* [ ] Redis caching
-* [ ] Docker containerization
-* [ ] CI/CD pipeline
-* [ ] AWS deployment
-* [ ] Advanced hotel search
-* [ ] Elasticsearch integration where justified
-
----
-
-# 👨‍💻 Author
+<br/>
 
 <div align="center">
 
-### Sujal Saini
-
-**B.Tech Computer Science & Engineering**
-
-Java Backend Developer · Spring Boot · REST APIs · Spring Security · Spring AI
-
-</div>
-
----
-
-<div align="center">
-
-### ⭐ StayBook
-
-**Built to explore real-world backend engineering challenges in hotel booking, inventory, pricing, authentication, and payments.**
+If this project helped you learn something, consider giving it a ⭐
 
 </div>
