@@ -1,0 +1,18 @@
+/* Airhouse custom styles */
+.active-nav {
+  background-color: var(--primary-light) !important;
+  color: var(--primary) !important;
+  font-weight: 700 !important;
+}
+
+.hover-link {
+  transition: var(--transition);
+}
+.hover-link:hover {
+  color: var(--primary);
+}
+
+.hover-danger:hover {
+  color: var(--error) !important;
+  background-color: rgba(239, 68, 68, 0.05);
+}

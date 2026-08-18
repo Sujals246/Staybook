@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hotel Booking Payment</title>
+
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      background: rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(20px);
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+      color: #fff;
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    fieldset {
+      border: none;
+      margin: 20px 0;
+      padding: 15px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 15px;
+    }
+
+    legend {
+      font-weight: bold;
+    }
+
+    label {
+      display: block;
+      margin-top: 12px;
+    }
+
+    input, textarea {
+      width: 100%;
+      margin-top: 6px;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      outline: none;
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+    }
+
+    textarea {
+      min-height: 80px;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    button {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: linear-gradient(45deg, #00c6ff, #0072ff);
+      color: white;
+    }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.2);
+      color: white;
+    }
+
+    #status {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.3);
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h2>💳 Hotel Booking Payment</h2>
+
+  <label>API Base URL</label>
+  <input id="apiBaseUrl">
+
+  <fieldset>
+    <legend>🔐 Login</legend>
+
+    <label>Email</label>
+    <input id="email" type="email">
+
+    <label>Password</label>
+    <input id="password" type="password">
+
+    <div class="btn-group">
+      <button id="loginButton" class="btn-secondary">Login</button>
+      <button id="refreshButton" class="btn-secondary">Refresh</button>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>💰 Payment</legend>
+
+    <label>Booking ID</label>
+    <input id="bookingId" type="number" value="5">
+
+    <label>Access Token</label>
+    <textarea id="accessToken"></textarea>
+
+    <button id="payButton" class="btn-primary">Pay Now</button>
+  </fieldset>
+
+  <div id="status">Status will appear here...</div>
+
+</div>
+
+<script>
+  const statusBox = document.getElementById("status");
+
+  function setStatus(msg) {
+    statusBox.textContent = msg;
+  }
+
+  function apiBaseUrl() {
+    return document.getElementById("apiBaseUrl").value.replace(/\/$/, "");
+  }
+
+  function authHeaders() {
+    const token = document.getElementById("accessToken").value.trim();
+    if (!token) throw new Error("Login first");
+    return {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + token
+    };
+  }
+
+  async function readJson(res) {
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || "Request failed");
+    return data.data || data;
+  }
+
+  /* LOGIN */
+  document.getElementById("loginButton").onclick = async () => {
+    try {
+      setStatus("Logging in...");
+      const res = await fetch(apiBaseUrl()+"/auth/login", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({
+          email: document.getElementById("email").value,
+          password: document.getElementById("password").value
+        })
+      });
+
+      const data = await readJson(res);
+
+      localStorage.setItem("token", data.accessToken);
+      document.getElementById("accessToken").value = data.accessToken;
+
+      setStatus("Login Successful ✅");
+    } catch(e) {
+      setStatus(e.message);
+    }
+  };
+
+  /* REFRESH */
+  document.getElementById("refreshButton").onclick = async () => {
+    try {
+      const res = await fetch(apiBaseUrl()+"/auth/refresh", {method:"POST"});
+      const data = await readJson(res);
+
+      localStorage.setItem("token", data.accessToken);
+      document.getElementById("accessToken").value = data.accessToken;
+
+      setStatus("Token Refreshed ✅");
+    } catch(e) {
+      setStatus(e.message);
+    }
+  };
+
+  /* PAYMENT */
+  document.getElementById("payButton").onclick = async () => {
+    try {
+      if (typeof Razorpay === "undefined") {
+        throw new Error("Razorpay not loaded");
+      }
+
+      const bookingId = document.getElementById("bookingId").value;
+      setStatus("Creating order...");
+
+      const res = await fetch(apiBaseUrl()+`/bookings/${bookingId}/payments`, {
+        method:"POST",
+        headers: authHeaders()
+      });
+
+      const order = await readJson(res);
+
+      const options = {
+        key: order.key,
+        amount: order.amount,
+        currency: order.currency || "INR",
+        order_id: order.orderId,
+
+        handler: async function (response) {
+          setStatus("Verifying payment...");
+
+          const verifyRes = await fetch(apiBaseUrl()+`/bookings/${bookingId}/payments/verify`, {
+            method:"POST",
+            headers: authHeaders(),
+            body: JSON.stringify({
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpayOrderId: response.razorpay_order_id,
+              razorpaySignature: response.razorpay_signature
+            })
+          });
+
+          const booking = await readJson(verifyRes);
+
+          setStatus(
+                  ` Payment Successful!
+
+Booking ID: ${booking.id}
+Amount: ₹${booking.amount}
+Status: ${booking.bookingStatus}
+Check-in: ${booking.checkInDate}
+Check-out: ${booking.checkOutDate}
+
+Invoice: ${apiBaseUrl()}/bookings/${bookingId}/invoice`
+          );
+
+          console.log("Booking:", booking);
+        },
+
+        modal: {
+          ondismiss: function () {
+            setStatus("Payment popup closed ");
+          }
+        }
+      };
+
+      const rzp = new Razorpay(options);
+
+      rzp.on("payment.failed", function (err) {
+        setStatus("Payment Failed \n" + (err.error?.description || ""));
+      });
+
+      rzp.open();
+
+    } catch(e) {
+      setStatus(e.message);
+    }
+  };
+
+  /* INIT */
+  document.getElementById("apiBaseUrl").value =
+          window.location.origin + "/api/v1";
+</script>
+
+</body>
+</html>
