@@ -31,6 +31,9 @@ build/
 
 ### VS Code ###
 .vscode/
+<<<<<<< HEAD
 src/main/resources/application.properties
 .DS_Store
 node_modules/
+=======
+>>>>>>> 025480ae9b019ebc82c963fff1e8c90b7a6c9cad
