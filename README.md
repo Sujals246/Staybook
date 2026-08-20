@@ -239,7 +239,7 @@ Guest Management
 ## Clone Repository
 
 ```bash
-git clone https://github.com/Sujals246/Airbnb-Booking-System-.git
+git clone https://github.com/Sujals246/Staybook.git
 ```
 
 ---
