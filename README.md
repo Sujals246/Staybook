@@ -18,7 +18,7 @@
 
 ## 📖 About The Project
 
-Airbnb Booking System is a **production-style full-stack web application** inspired by Airbnb that enables users to discover hotels, browse rooms, securely book accommodations, and complete online payments using **Razorpay**.
+StayBook is a **production-style full-stack web application** inspired by Airbnb that enables users to discover hotels, browse rooms, securely book accommodations, and complete online payments using **Razorpay**.
 
 The application follows a scalable layered architecture with secure authentication, RESTful APIs, role-based authorization, inventory management, booking workflows, and integrated payment processing.
 
