@@ -1,5 +1,5 @@
 <<<<<<< HEAD
-# 🏨 Airbnb Booking System
+# 🏨 StayBook - Full stack Hotel booking & payment platform
 
 <p align="center">
 
