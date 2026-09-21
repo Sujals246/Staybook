@@ -1,399 +1,451 @@
-# 🏨 Staybook
+# 🏨 StayBook
 
-### Hotel Booking & Payments Platform
+### Full-Stack Hotel Booking & Reservation Platform
 
-Staybook is a full-stack hotel booking platform built with **Java, Spring Boot, React, MySQL, and Razorpay**.
+StayBook is a full-stack hotel booking platform built with **Java 17, Spring Boot, React, and MySQL**.
 
-The platform allows users to search hotels, check room availability, reserve rooms, add guest details, make online payments, manage bookings, and process cancellations. Hotel managers can manage hotels, rooms, inventory, pricing, bookings, and revenue reports.
+The application implements a complete hotel reservation workflow including **hotel discovery, date-based room availability, temporary inventory reservation, dynamic pricing, JWT authentication, role-based hotel management, Razorpay payments, payment verification, webhooks, refunds, booking cancellation, guest management, and revenue reporting**.
 
-The backend focuses on practical booking-system challenges such as **inventory reservation, concurrent booking protection, dynamic pricing, JWT authentication, payment verification, and webhook-based payment updates.**
+The backend is containerized with **Docker** and deployed on **Render**, the React frontend is deployed on **Vercel**, and the production MySQL database is hosted on **Aiven**.
 
 ---
 
-## ✨ Key Features
+## 🌐 Live Application
 
-### 👤 Guest
+**Live Website:**
+https://staybook-ivm8tmd1t-sujal-4e62.vercel.app/
+
+**GitHub Repository:**
+https://github.com/Sujals246/Staybook
+
+---
+
+# 📌 Project Overview
+
+StayBook is designed around the core engineering challenges involved in a real-world reservation system rather than treating hotel booking as a simple CRUD application.
+
+The system handles:
+
+* Date-based inventory
+* Concurrent booking requests
+* Temporary room reservations
+* Transactional inventory updates
+* Dynamic pricing
+* Secure authentication
+* Role-based authorization
+* Payment processing
+* Payment verification
+* Webhook handling
+* Refunds
+* Booking cancellation
+* Hotel management
+* Revenue reporting
+
+The overall booking lifecycle is:
+
+```text
+Search
+  ↓
+Select Hotel & Room
+  ↓
+Check Availability
+  ↓
+Initialize Reservation
+  ↓
+Reserve Inventory
+  ↓
+Add Guest Details
+  ↓
+Create Payment Order
+  ↓
+Complete Payment
+  ↓
+Verify Payment
+  ↓
+Confirm Booking
+```
+
+---
+
+# ✨ Features
+
+## 👤 Guest Features
+
+### Authentication & Security
 
 * User registration and login
 * JWT-based authentication
-* Access token and refresh token flow
-* Hotel search by city, dates, and room count
-* Hotel and room details
-* Real-time room availability
-* Multi-day room booking
-* Dynamic room pricing
-* Add multiple guests to a booking
-* Razorpay payment integration
-* Server-side payment verification
-* Booking history and status tracking
+* Access and refresh token architecture
+* HttpOnly refresh-token cookie
+* BCrypt password hashing
+* Automatic access-token refresh
+* Protected REST APIs
+* Role-based authorization
+* Method-level authorization
+
+### Hotel Discovery
+
+* Search hotels by city
+* Date-based availability search
+* Room-count based search
+* Paginated search results
+* Hotel details
+* Room information
+* Date-specific pricing
+* Real-time inventory availability
+
+### Booking
+
+* Multi-day room bookings
+* Multiple-room reservations
+* Temporary inventory reservation
+* Guest information collection
+* Booking status tracking
+* Booking history
+* Booking expiration
 * Booking cancellation
+
+### Guest Management
+
+Users can maintain reusable guest information:
+
+* Add guests
+* Update guests
+* Delete guests
+* View saved guests
+* Select saved guests during checkout
+
+---
+
+# 💳 Payment System
+
+StayBook integrates **Razorpay** for online payments.
+
+The payment workflow includes:
+
+* Razorpay order creation
+* Razorpay Checkout
+* Server-side payment verification
+* Payment signature verification
+* Order validation
+* Payment ID validation
+* Payment amount validation
+* Payment status validation
+* Failed-payment handling
+* Razorpay webhook processing
 * Refund processing
-* Downloadable booking receipt
-* Profile management
 
-### 🏨 Hotel Manager
+### Payment Flow
 
-* Create and manage hotels
-* Update hotel information
-* Activate/deactivate hotels
-* Create and manage rooms
-* Configure room capacity and pricing
-* Initialize room inventory
-* Manage date-wise inventory
-* Configure surge pricing
-* View hotel bookings
-* View revenue reports
-* Role-based access control
+```text
+Booking
+   ↓
+Calculate Amount
+   ↓
+Create Razorpay Order
+   ↓
+Razorpay Checkout
+   ↓
+Payment
+   ↓
+Backend Verification
+   ↓
+Validate Order / Payment / Amount
+   ↓
+Confirm Payment
+   ↓
+Confirm Booking
+```
+
+The frontend payment callback is **not treated as sufficient proof of payment**. Payment information is validated on the backend before the booking is confirmed.
 
 ---
 
-# 🏗 Architecture
+# 🔔 Razorpay Webhooks
+
+StayBook supports Razorpay webhook processing for payment lifecycle events.
 
 ```text
-┌──────────────────────────┐
-│      React Frontend      │
-│        Vite + React      │
-└────────────┬─────────────┘
-             │
-             │ REST APIs / JSON
-             ▼
-┌──────────────────────────┐
-│     Spring Security      │
-│       JWT Filter         │
-└────────────┬─────────────┘
-             │
-             ▼
-┌──────────────────────────┐
-│       Controllers        │
-│        REST Layer        │
-└────────────┬─────────────┘
-             │
-             ▼
-┌──────────────────────────┐
-│         Services         │
-│     Business Logic       │
-└────────────┬─────────────┘
-             │
-             ▼
-┌──────────────────────────┐
-│       Repositories       │
-│     Spring Data JPA      │
-└────────────┬─────────────┘
-             │
-             ▼
-┌──────────────────────────┐
-│          MySQL           │
-│     JPA / Hibernate      │
-└──────────────────────────┘
+Razorpay
+    ↓
+Webhook Endpoint
+    ↓
+Signature Verification
+    ↓
+Event Processing
+    ↓
+Update Payment / Booking State
+```
 
+Webhook signatures are verified using HMAC-based validation before processing events.
+
+Supported payment-related events include payment success, payment failure, and refund-related events.
+
+---
+
+# 💸 Refund & Cancellation
+
+The booking cancellation flow handles payment state and refund processing.
+
+```text
+Confirmed Booking
+       ↓
+Cancellation Request
+       ↓
+Validate Booking
+       ↓
+Check Payment
+       ↓
+Create Refund
+       ↓
+Update Payment State
+       ↓
+Release Inventory
+       ↓
+Cancel Booking
+```
+
+This keeps the booking, payment, refund, and inventory states synchronized through backend business logic.
+
+---
+
+# 🔒 Concurrent Inventory Management
+
+One of the key engineering aspects of StayBook is **concurrency-safe room inventory management**.
+
+Inventory is maintained at the:
+
+> **Room + Date level**
+
+Each inventory record maintains information such as:
+
+```text
+Total Inventory
+Booked Inventory
+Reserved Inventory
+Price
+Surge Factor
+Closed Status
+Date
+```
+
+Available inventory is calculated as:
+
+```text
+Available =
+Total Count
+- Booked Count
+- Reserved Count
+```
+
+## Pessimistic Locking
+
+The booking workflow uses transactional database operations with **pessimistic write locking** when modifying critical inventory records.
+
+Conceptually:
+
+```text
+User A ───────┐
               │
-              │ Payment Integration
+User B ───────┼──→ Same Room / Same Date
+              │
               ▼
-       ┌───────────────┐
-       │   Razorpay    │
-       │ Orders / Pay  │
-       │ Webhooks      │
-       │ Refunds       │
-       └───────────────┘
+        Database Lock
+              │
+              ▼
+      Check Availability
+              │
+              ▼
+       Reserve Inventory
+              │
+              ▼
+        Create Booking
+              │
+              ▼
+       Commit Transaction
 ```
 
-### Backend request flow
-
-```text
-Client
-  ↓
-Controller
-  ↓
-Service
-  ↓
-Repository
-  ↓
-JPA / Hibernate
-  ↓
-MySQL
-```
-
-The application follows a layered architecture where controllers handle HTTP requests, services contain business logic, repositories manage persistence, and DTOs define API contracts.
+This prevents concurrent transactions from incorrectly treating the same inventory as available.
 
 ---
 
-# 🔄 Booking Flow
+# ⏳ Temporary Reservation
 
-The booking system follows a state-based lifecycle:
+StayBook does not immediately mark inventory as permanently booked when a user starts the booking process.
 
-```text
-RESERVED
-    ↓
-GUESTS_ADDED
-    ↓
-PAYMENTS_PENDING
-    ↓
-CONFIRMED
-```
-
-Cancellation or failed/expired payment can transition the booking to:
+Instead:
 
 ```text
-CANCELLED
+Available
+   ↓
+Reserved
+   ↓
+Payment Pending
+   ↓
+Confirmed
 ```
 
-### Complete booking flow
+If the booking is not completed within the configured reservation window, the reservation can expire and the inventory can become available again.
 
-```text
-User searches hotels
-        ↓
-Selects hotel and room
-        ↓
-Initializes booking
-        ↓
-Inventory availability checked
-        ↓
-Inventory rows locked
-        ↓
-Rooms temporarily reserved
-        ↓
-Booking created
-        ↓
-Guest details added
-        ↓
-Razorpay order created
-        ↓
-User completes payment
-        ↓
-Payment signature verified
-        ↓
-Payment details verified with Razorpay
-        ↓
-Booking confirmed
-        ↓
-Reserved inventory converted to booked inventory
-```
-
----
-
-# 🔒 Concurrency-Safe Inventory
-
-Inventory is maintained **per room and per date**.
-
-Each inventory record contains values such as:
-
-```text
-totalCount
-bookedCount
-reservedCount
-closed
-surgeFactor
-price
-date
-```
-
-Available rooms are calculated as:
-
-```text
-availableCount =
-    totalCount - bookedCount - reservedCount
-```
-
-### Why reservation is required
-
-Consider a room with only one available unit.
-
-Without temporary reservation:
-
-```text
-User A → sees 1 room
-User B → sees 1 room
-
-User A → books
-User B → books
-
-❌ Overbooking
-```
-
-Staybook temporarily reserves inventory during the booking process:
-
-```text
-User A
-   ↓
-Lock inventory
-   ↓
-Check availability
-   ↓
-Reserve room
-   ↓
-Transaction commits
-   ↓
-Lock released
-
-User B
-   ↓
-Reads updated inventory
-   ↓
-Booking succeeds or fails based on availability
-```
-
-The booking operation uses **transactional database operations and pessimistic locking** to protect inventory during concurrent booking attempts.
+This separates **temporary reservation state** from **confirmed booking state**.
 
 ---
 
 # 💰 Dynamic Pricing Engine
 
-Room pricing is calculated using a chain of pricing strategies.
+StayBook implements a composable dynamic pricing system rather than hard-coding every pricing rule into one service method.
+
+The pricing pipeline is conceptually:
 
 ```text
 Base Price
-     ↓
+    ↓
 Surge Pricing
-     ↓
+    ↓
 Occupancy Pricing
-     ↓
+    ↓
 Urgency Pricing
-     ↓
-Holiday / Weekend Pricing
-     ↓
+    ↓
+Holiday Pricing
+    ↓
 Final Price
 ```
 
-### Example
+The implementation uses a **Strategy + Decorator-style design**, allowing individual pricing rules to remain independent and composable.
 
-```text
-Base Price                 ₹2,000
-      ↓
-Surge Pricing              ₹2,000
-      ↓
-High Occupancy × 1.20      ₹2,400
-      ↓
-Urgency × 1.15             ₹2,760
-      ↓
-Holiday × 1.25             ₹3,450
-```
+### Pricing Factors
 
-The pricing system uses a **Strategy / Decorator-style design** so individual pricing rules can be composed without putting all pricing logic into one large method.
+The current implementation considers factors such as:
 
-This makes it easier to introduce additional pricing rules in the future.
+* Base room price
+* Inventory surge factor
+* Occupancy
+* Booking urgency
+* Holiday periods
+
+This architecture makes it easier to introduce additional pricing rules without rewriting the entire pricing engine.
 
 ---
 
-# 💳 Payment Architecture
+# 🏨 Hotel Manager Dashboard
 
-Staybook integrates **Razorpay** for online payments.
+StayBook provides protected hotel-management functionality for users with the manager role.
 
-```text
-User selects room
-       ↓
-Backend initializes booking
-       ↓
-Backend calculates booking amount
-       ↓
-Razorpay order created
-       ↓
-Razorpay Checkout
-       ↓
-Payment completed
-       ↓
-Backend verifies payment signature
-       ↓
-Backend validates order/payment details
-       ↓
-Booking confirmed
-```
+## Hotel Management
 
-### Server-side payment verification
+Managers can:
 
-The backend does not rely solely on the frontend payment response.
+* Create hotels
+* View owned hotels
+* Update hotel information
+* Activate/deactivate hotels
+* Delete hotels
 
-Payment verification includes:
+## Room Management
 
-* Razorpay signature verification
-* Order ID validation
-* Payment ID validation
-* Payment status validation
-* Payment amount validation
+Managers can:
 
-### Razorpay webhook
+* Create rooms
+* View rooms
+* Delete rooms
+* Configure room capacity
+* Configure base pricing
 
-The application also supports Razorpay webhook events.
+## Inventory Management
 
-```text
-Razorpay
-    ↓
-Webhook
-    ↓
-Signature verification
-    ↓
-Payment event processing
-    ↓
-Booking / payment status update
-```
+Managers can:
 
-This provides a server-to-server payment update path when the browser-side payment callback is unavailable.
+* Initialize room inventory
+* View inventory
+* Update inventory
+* Configure date ranges
+* Close selected dates
+* Configure surge factors
+* Recalculate pricing
+
+## Booking Management
+
+Managers can:
+
+* View bookings associated with their hotels
+* Monitor booking activity
+* Access hotel-specific booking information
+
+Ownership validation ensures that managers cannot access management operations for hotels they do not own.
 
 ---
 
-# 🔐 Authentication & Authorization
+# 📊 Revenue Reporting
 
-Authentication is implemented using **Spring Security and JWT**.
+The manager dashboard provides hotel-level reporting capabilities.
 
-### Login flow
+Reports can include:
+
+* Confirmed booking count
+* Confirmed revenue
+* Average revenue per confirmed booking
+* Date-range based reporting
+
+Example:
+
+```text
+Hotel
+  ↓
+Date Range
+  ↓
+Confirmed Bookings
+  ↓
+Revenue Calculation
+  ↓
+Management Report
+```
+
+---
+
+# 🔐 Authentication Architecture
+
+StayBook uses **Spring Security + JWT**.
+
+### Authentication Flow
 
 ```text
 Email + Password
        ↓
 AuthenticationManager
        ↓
-User validation
+Validate Credentials
        ↓
-BCrypt password verification
+Generate Tokens
        ↓
-JWT Access Token
+Access Token
        +
 Refresh Token
 ```
 
-### Access token
+The refresh token is stored in an **HttpOnly cookie**, while access tokens are used for authenticated API requests.
 
-* Short-lived
-* Sent using the `Authorization: Bearer <token>` header
-* Used for authenticated API requests
+Protected requests use:
 
-### Refresh token
-
-* Long-lived
-* Stored using an HttpOnly cookie
-* Used to generate a new access token
-
-### JWT request flow
-
-```text
-HTTP Request
-     ↓
-JWTAuthFilter
-     ↓
-Extract Bearer Token
-     ↓
-Validate JWT
-     ↓
-Extract User Identity
-     ↓
-Create Authentication
-     ↓
-SecurityContext
-     ↓
-Controller
+```http
+Authorization: Bearer <access-token>
 ```
+
+When an access token expires, the frontend can request a new access token through the refresh-token flow.
 
 ---
 
-# 👥 Role-Based Access Control
+# 👥 Role-Based Authorization
 
-The application supports two primary roles:
+The application supports role-based access control.
+
+Current application roles include:
 
 ```text
 GUEST
 HOTEL_MANAGER
 ```
 
-Manager-specific APIs are protected using Spring Security role-based authorization.
+Manager-only operations are protected using Spring Security authorization rules and method-level security.
 
 Example:
 
@@ -401,32 +453,140 @@ Example:
 @PreAuthorize("hasRole('HOTEL_MANAGER')")
 ```
 
-This prevents users without the required role from accessing protected management operations.
+This prevents normal users from accessing hotel-management operations.
 
 ---
 
-# 🗃 Data Model
+# 🏗️ Backend Architecture
+
+StayBook follows a layered Spring Boot architecture.
+
+```text
+                    REST Request
+                         ↓
+                ┌────────────────┐
+                │   Controller   │
+                └───────┬────────┘
+                        ↓
+                ┌────────────────┐
+                │    Service     │
+                └───────┬────────┘
+                        ↓
+                ┌────────────────┐
+                │   Repository   │
+                └───────┬────────┘
+                        ↓
+                ┌────────────────┐
+                │ JPA / Hibernate│
+                └───────┬────────┘
+                        ↓
+                ┌────────────────┐
+                │     MySQL      │
+                └────────────────┘
+```
+
+### Controller Layer
+
+Responsible for:
+
+* HTTP request handling
+* Request/response mapping
+* Validation
+* Authorization boundaries
+
+### Service Layer
+
+Contains business logic such as:
+
+* Booking
+* Inventory
+* Pricing
+* Payments
+* Refunds
+* Hotel management
+* Reporting
+
+### Repository Layer
+
+Handles persistence using:
+
+* Spring Data JPA
+* Hibernate
+* Custom queries
+* Transactional locking
+
+---
+
+# 🧩 Design Patterns & Engineering Practices
+
+The project demonstrates several practical software engineering concepts.
+
+### Strategy Pattern
+
+Used for composing individual pricing strategies.
+
+```text
+PricingStrategy
+      ↓
+ ┌────┴─────┬──────────┬──────────┐
+ ↓          ↓          ↓          ↓
+Surge    Occupancy   Urgency    Holiday
+```
+
+### Decorator-Style Composition
+
+Pricing strategies can be wrapped/composed into a pipeline so that additional rules can be added independently.
+
+### DTO Pattern
+
+DTOs are used to separate API contracts from persistence entities.
+
+### Repository Pattern
+
+Spring Data repositories abstract database operations from business logic.
+
+### Transaction Management
+
+Critical booking and inventory operations are performed transactionally.
+
+### Pessimistic Locking
+
+Used to protect high-contention inventory operations.
+
+### BigDecimal
+
+Monetary calculations use `BigDecimal` to avoid floating-point precision problems.
+
+---
+
+# 🗃️ Data Model
+
+The main domain entities include:
 
 ```text
 User
- ├── Hotels
+ │
  ├── Bookings
- └── Guests
+ ├── Guests
+ └── Hotels
 
 Hotel
+ │
  ├── Rooms
  ├── Inventory
  └── Bookings
 
 Room
+ │
  └── Inventory
 
 Booking
+ │
  ├── Guests
  └── Payment
 ```
 
-### Core entities
+Core entities include:
 
 * `User`
 * `Hotel`
@@ -438,152 +598,89 @@ Booking
 * `HotelContactInfo`
 * `HotelMinPrice`
 
-### Inventory model
+---
 
-Inventory is maintained for individual rooms and dates, allowing the system to support:
+# 🖥️ Frontend
 
-* Date-specific availability
-* Date-specific pricing
-* Weekend pricing
-* Holiday pricing
-* Occupancy-based pricing
-* Temporary reservations
-* Closed inventory dates
+The frontend is a **React 19 + Vite** application located in:
+
+```text
+staybook-frontend/
+```
+
+### Main User Flows
+
+```text
+Hotel Search
+     ↓
+Hotel Details
+     ↓
+Room Selection
+     ↓
+Checkout
+     ↓
+Payment
+     ↓
+Booking Confirmation
+```
+
+### Frontend Areas
+
+* Hotel search
+* Hotel details
+* Checkout
+* Payment
+* Booking history
+* Profile
+* Guest management
+* Manager dashboard
+* Authentication
+* Dark mode
+
+The frontend communicates with the Spring Boot backend through REST APIs.
 
 ---
 
-# 🧠 Key Design Decisions
-
-### Pessimistic Locking
-
-Booking inventory is a high-contention resource. Pessimistic database locking is used to prevent concurrent transactions from reserving the same inventory incorrectly.
-
-### Strategy / Decorator Pricing
-
-Pricing rules are separated into individual strategies so they can be composed and extended without creating a large conditional pricing method.
-
-### DTO-Based API Design
-
-DTOs are used between the API and persistence layers to control the data exposed to clients and keep API contracts separate from database entities.
-
-### `BigDecimal` for Monetary Values
-
-`BigDecimal` is used for monetary calculations to avoid floating-point precision problems associated with `double` and `float`.
-
-### Separate User and Guest Models
-
-The authenticated user making a booking is not necessarily the only person staying at the hotel. A booking can therefore contain multiple guest records.
-
-### Booking Reservation
-
-Inventory is temporarily reserved before payment so rooms are not simultaneously offered to multiple users during checkout.
-
----
-
-# 🧪 Testing
-
-The project includes Spring Boot test infrastructure and context-level testing.
-
-Testing priorities include:
-
-* Booking lifecycle
-* Inventory availability
-* Concurrent booking scenarios
-* Dynamic pricing
-* JWT authentication
-* Payment verification
-* Refund processing
-* Webhook handling
-
----
-
-# 📡 API Overview
-
-## Authentication
-
-| Method | Endpoint        | Description          |
-| ------ | --------------- | -------------------- |
-| `POST` | `/auth/signup`  | Register a user      |
-| `POST` | `/auth/login`   | Authenticate user    |
-| `POST` | `/auth/refresh` | Refresh access token |
-
-## Hotel Search
-
-| Method | Endpoint                 | Description                                     |
-| ------ | ------------------------ | ----------------------------------------------- |
-| `POST` | `/hotels/search`         | Search hotels by location, dates and room count |
-| `POST` | `/hotels/{hotelId}/info` | Get hotel and room information                  |
-
-## Booking
-
-| Method | Endpoint                 | Description          |
-| ------ | ------------------------ | -------------------- |
-| `POST` | `/bookings/init`         | Initialize a booking |
-| `POST` | `/bookings/{id}/guest`   | Add guest details    |
-| `GET`  | `/bookings/{id}/status`  | Get booking status   |
-| `POST` | `/bookings/{id}/cancel`  | Cancel a booking     |
-| `GET`  | `/bookings/{id}/invoice` | Get booking receipt  |
-
-## Payments
-
-| Method | Endpoint                         | Description                     |
-| ------ | -------------------------------- | ------------------------------- |
-| `POST` | `/bookings/{id}/payments`        | Create payment order            |
-| `POST` | `/bookings/{id}/payments/verify` | Verify payment                  |
-| `POST` | `/bookings/{id}/payments/failed` | Handle failed payment           |
-| `POST` | `/webhooks/razorpay`             | Process Razorpay webhook events |
-
-## Hotel Manager
-
-| Method   | Endpoint                                           | Description               |
-| -------- | -------------------------------------------------- | ------------------------- |
-| `POST`   | `/admin/hotels`                                    | Create hotel              |
-| `GET`    | `/admin/hotels/{id}`                               | Get hotel                 |
-| `PUT`    | `/admin/hotels/{id}`                               | Update hotel              |
-| `PATCH`  | `/admin/hotels/{id}`                               | Activate/deactivate hotel |
-| `DELETE` | `/admin/hotels/{id}`                               | Delete hotel              |
-| `GET`    | `/admin/hotels/{id}/bookings`                      | View hotel bookings       |
-| `GET`    | `/admin/hotels/{id}/reports`                       | View revenue reports      |
-| `POST`   | `/admin/hotels/{hotelId}/rooms`                    | Create room               |
-| `PATCH`  | `/admin/hotels/{hotelId}/rooms/{roomId}/inventory` | Update room inventory     |
-
----
-
-# 📂 Project Structure
+# 📁 Project Structure
 
 ```text
 Staybook/
 │
 ├── src/
 │   ├── main/
-│   │   ├── java/com/logic/
-│   │   │   ├── controller/
-│   │   │   ├── Service/
-│   │   │   ├── Repository/
-│   │   │   ├── entity/
-│   │   │   │   └── enums/
-│   │   │   ├── DTO/
-│   │   │   ├── security/
-│   │   │   ├── strategy/
-│   │   │   ├── advice/
-│   │   │   ├── config/
-│   │   │   ├── exception/
-│   │   │   └── utils/
+│   │   ├── java/
+│   │   │   └── com/
+│   │   │       └── logic/
+│   │   │           ├── controller/
+│   │   │           ├── Service/
+│   │   │           ├── Repository/
+│   │   │           ├── entity/
+│   │   │           ├── DTO/
+│   │   │           ├── security/
+│   │   │           ├── strategy/
+│   │   │           ├── config/
+│   │   │           ├── advice/
+│   │   │           ├── exception/
+│   │   │           └── utils/
 │   │   │
 │   │   └── resources/
 │   │
 │   └── test/
 │
-├── airhouse-frontend/
+├── staybook-frontend/
 │   ├── src/
 │   │   ├── components/
 │   │   ├── views/
 │   │   ├── context/
-│   │   └── api.js
+│   │   ├── assets/
+│   │   ├── api.js
+│   │   └── App.jsx
+│   │
 │   ├── public/
-│   └── package.json
+│   ├── package.json
+│   └── vite.config.js
 │
-├── .mvn/
+├── Dockerfile
 ├── pom.xml
 ├── mvnw
 ├── mvnw.cmd
@@ -594,92 +691,145 @@ Staybook/
 
 ---
 
-# 🛠 Tech Stack
+# 🐳 Dockerization
 
-| Category          | Technology                  |
-| ----------------- | --------------------------- |
-| Language          | Java 17                     |
-| Backend           | Spring Boot                 |
-| Web               | Spring MVC                  |
-| Security          | Spring Security + JWT       |
-| ORM               | Hibernate / JPA             |
-| Database          | MySQL 8                     |
-| Frontend          | React 19                    |
-| Build Tool        | Maven                       |
-| Frontend Tooling  | Vite                        |
-| Payment Gateway   | Razorpay                    |
-| API Documentation | SpringDoc OpenAPI / Swagger |
-| Version Control   | Git / GitHub                |
+The Spring Boot backend is containerized using a **multi-stage Docker build**.
+
+### Build Stage
+
+```text
+Java 17 JDK
+    ↓
+Maven Build
+    ↓
+Spring Boot JAR
+```
+
+### Runtime Stage
+
+```text
+Java 17 Runtime
+    ↓
+Application JAR
+    ↓
+Docker Container
+```
+
+This keeps the build environment separate from the runtime image and produces a cleaner deployment artifact.
+
+### Build
+
+```bash
+docker build -t staybook-backend .
+```
+
+### Run
+
+```bash
+docker run -p 10000:10000 staybook-backend
+```
 
 ---
 
-# 🚀 Getting Started
+# ☁️ Cloud Deployment
+
+StayBook is deployed using a multi-service cloud architecture.
+
+```text
+                         GitHub
+                           │
+              ┌────────────┴────────────┐
+              │                         │
+              ▼                         ▼
+           Vercel                    Render
+              │                         │
+              ▼                         ▼
+      React Frontend          Dockerized Spring Boot
+                                        │
+                                        ▼
+                                   Aiven MySQL
+                                        │
+                          ┌─────────────┴─────────────┐
+                          │                           │
+                          ▼                           ▼
+                       Razorpay                Application Data
+```
+
+### Frontend
+
+**Vercel**
+
+Hosts the production React/Vite application.
+
+### Backend
+
+**Render**
+
+Hosts the Dockerized Spring Boot REST API.
+
+### Database
+
+**Aiven**
+
+Provides managed MySQL infrastructure for persistent application data.
+
+### Payments
+
+**Razorpay**
+
+Handles payment processing, verification, webhooks, and refunds.
+
+---
+
+# ⚙️ Configuration
+
+Sensitive credentials are supplied through environment-specific configuration rather than committed to Git.
+
+Typical backend configuration includes:
+
+```properties
+spring.datasource.url=
+spring.datasource.username=
+spring.datasource.password=
+
+jwt.secretKey=
+
+razorpay.key.id=
+razorpay.key.secret=
+razorpay.webhook.secret=
+```
+
+Frontend API configuration:
+
+```text
+VITE_API_BASE_URL
+```
+
+Production secrets should never be committed to source control.
+
+---
+
+# 🚀 Run Locally
 
 ## Prerequisites
 
-Make sure the following are installed:
-
 * Java 17+
 * Maven
-* Node.js 18+
-* MySQL 8+
-* Razorpay test account for payment testing
+* Node.js
+* npm
+* MySQL
+* Docker
+* Razorpay test credentials
 
----
-
-## 1. Clone the repository
+## Clone
 
 ```bash
 git clone https://github.com/Sujals246/Staybook.git
+
 cd Staybook
 ```
 
----
-
-## 2. Configure MySQL
-
-Create a database:
-
-```sql
-CREATE DATABASE staybook;
-```
-
-Configure the datasource in your local Spring Boot configuration:
-
-```properties
-spring.datasource.url=jdbc:mysql://localhost:3306/staybook
-spring.datasource.username=your_username
-spring.datasource.password=your_password
-```
-
----
-
-## 3. Configure application credentials
-
-Configure the required JWT and Razorpay credentials in your local configuration.
-
-Example:
-
-```properties
-jwt.secretKey=your_secret_key
-
-razorpay.key.id=your_razorpay_key
-razorpay.key.secret=your_razorpay_secret
-razorpay.webhook.secret=your_webhook_secret
-```
-
-Do not commit real credentials to the repository.
-
----
-
-## 4. Run the backend
-
-### macOS / Linux
-
-```bash
-./mvnw clean install
-./mvnw spring-boot:run
-```
+## Backend
 
 ### Windows
 
@@ -688,119 +838,195 @@ mvnw.cmd clean install
 mvnw.cmd spring-boot:run
 ```
 
----
-
-## 5. Run the frontend
+### macOS / Linux
 
 ```bash
-cd airhouse-frontend
+./mvnw clean install
+./mvnw spring-boot:run
+```
+
+## Frontend
+
+```bash
+cd staybook-frontend
+
 npm install
+
 npm run dev
 ```
 
----
-
-# 📸 Screenshots
-
-Place screenshots inside:
+Configure the frontend with:
 
 ```text
-docs/
-└── screenshots/
+VITE_API_BASE_URL
 ```
 
-Recommended screenshots:
-
-* Hotel search
-* Hotel listing
-* Hotel details
-* Checkout
-* Razorpay payment
-* Booking confirmation
-* My bookings
-* Manager dashboard
-
-Example:
-
-```markdown
-## Hotel Search
-
-![Hotel Search](docs/screenshots/home.png)
-
-## Hotel Details
-
-![Hotel Details](docs/screenshots/hotel-details.png)
-
-## Checkout
-
-![Checkout](docs/screenshots/checkout.png)
-
-## Booking Confirmation
-
-![Booking Confirmation](docs/screenshots/booking-confirmation.png)
-
-## Manager Dashboard
-
-![Manager Dashboard](docs/screenshots/manager-dashboard.png)
-```
+pointing to the running Spring Boot backend.
 
 ---
 
-# 🚀 Future Enhancements
+# 📚 API Documentation
 
-* Email notifications for booking confirmation
-* Google OAuth authentication
-* Reviews and ratings
-* Wishlist functionality
-* Dockerized deployment
-* CI/CD pipeline
-* AWS deployment
-* Redis-based caching
-* Improved automated test coverage
+The backend includes **SpringDoc OpenAPI / Swagger UI** support.
+
+Once the application is running, the generated API documentation can be used to:
+
+* Explore REST endpoints
+* Inspect request/response models
+* Test APIs
+* Review API contracts
 
 ---
 
-# 🎯 What This Project Demonstrates
+# 🧪 Testing
 
-Staybook demonstrates practical experience with:
+The project includes Spring Boot testing infrastructure.
 
-* Java and Object-Oriented Programming
-* Collections and Generics
-* Streams and Lambda expressions
-* Spring Boot
-* REST API development
-* Dependency Injection
-* Spring Security
-* JWT authentication
-* Role-based authorization
+The architecture provides clear boundaries for testing:
+
+* Authentication
+* Booking lifecycle
+* Inventory locking
+* Dynamic pricing
+* Payment verification
+* Refund processing
+* Webhooks
+* Manager authorization
+* Repository operations
+
+---
+
+# 🛠️ Technology Stack
+
+| Category            | Technology        |
+| ------------------- | ----------------- |
+| Backend Language    | Java 17           |
+| Backend Framework   | Spring Boot 4.0.5 |
+| Web                 | Spring MVC        |
+| Security            | Spring Security   |
+| Authentication      | JWT               |
+| Password Hashing    | BCrypt            |
+| ORM                 | JPA / Hibernate   |
+| Database            | MySQL             |
+| Frontend            | React 19.2.6      |
+| Build Tool          | Maven             |
+| Frontend Build Tool | Vite 8            |
+| Payments            | Razorpay          |
+| API Documentation   | SpringDoc OpenAPI |
+| Containerization    | Docker            |
+| Frontend Hosting    | Vercel            |
+| Backend Hosting     | Render            |
+| Database Hosting    | Aiven             |
+| Version Control     | Git / GitHub      |
+
+---
+
+# 🎯 Key Engineering Highlights
+
+StayBook demonstrates practical implementation of:
+
+**Backend**
+
+* Spring Boot REST APIs
+* Layered architecture
+* Dependency injection
+* DTO-based API design
 * JPA / Hibernate
 * MySQL
-* Transactions
-* Pessimistic locking
-* Concurrency handling
-* Inventory management
-* Dynamic pricing
-* Design patterns
-* Razorpay integration
-* Payment verification
-* Webhooks
-* Refund processing
-* DTO-based API design
+* Transaction management
 * Exception handling
-* React frontend integration
+
+**Security**
+
+* Spring Security
+* JWT
+* Access/refresh tokens
+* HttpOnly cookies
+* BCrypt
+* Role-based authorization
+* Method-level security
+
+**Booking Systems**
+
+* Date-based inventory
+* Temporary reservations
+* Booking expiration
+* Pessimistic locking
+* Concurrent inventory protection
+* Booking state management
+
+**Pricing**
+
+* Strategy pattern
+* Decorator-style composition
+* Surge pricing
+* Occupancy pricing
+* Urgency pricing
+* Holiday pricing
+* BigDecimal-based monetary calculations
+
+**Payments**
+
+* Razorpay
+* Order creation
+* Payment verification
+* Signature validation
+* Webhooks
+* Failed payments
+* Refunds
+
+**Full Stack**
+
+* React
+* Vite
+* REST API integration
+* Authentication state
+* Checkout workflow
+* Manager dashboard
+
+**Deployment**
+
+* Docker
+* Multi-stage builds
+* Vercel
+* Render
+* Aiven
+
+---
+
+# 🔮 Future Improvements
+
+Potential extensions to the platform include:
+
+* Comprehensive unit and integration testing
+* Automated CI/CD
+* Redis caching
+* Asynchronous event processing
+* Email booking notifications
+* OAuth authentication
+* Reviews and ratings
+* Wishlist functionality
+* Centralized logging
+* Application monitoring
+* Production observability
+
+These are **future improvements and are not part of the current implementation**.
 
 ---
 
 # 👨‍💻 Author
 
-### Sujal Saini
+## Sujal Saini
 
-**Java Backend Developer | Spring Boot | MySQL**
+**B.Tech Computer Science & Engineering — 2026**
 
-GitHub: [@Sujals246](https://github.com/Sujals246)
+**Focus:** Java • Spring Boot • Backend Development • REST APIs • MySQL
+
+GitHub:
+https://github.com/Sujals246/Sujals246
 
 ---
 
-## ⭐ Staybook
+## ⭐ StayBook
 
-A full-stack hotel booking platform designed around real-world backend challenges such as **inventory concurrency, secure payments, dynamic pricing, authentication, and booking lifecycle management**.
+A full-stack hotel booking platform focused on the engineering challenges behind **inventory consistency, concurrent reservations, dynamic pricing, secure payments, authentication, and cloud deployment**.
