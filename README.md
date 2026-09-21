@@ -13,7 +13,7 @@ The backend is containerized with **Docker** and deployed on **Render**, the Rea
 ## 🌐 Live Application
 
 **Live Website:**
-https://staybook-ivm8tmd1t-sujal-4e62.vercel.app/
+https://staybook-eta.vercel.app/
 
 **GitHub Repository:**
 https://github.com/Sujals246/Staybook
