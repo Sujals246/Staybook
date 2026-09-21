@@ -17,7 +17,7 @@ export default function Footer() {
         gap: '16px'
       }}>
         <div style={{ fontWeight: 600 }}>
-          © {new Date().getFullYear()} <span style={{ color: 'var(--primary)' }}>Airhouse</span> Inc.
+          © {new Date().getFullYear()} <span style={{ color: 'var(--primary)' }}>StayBook</span> Inc.
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-muted)' }}>
           Made with <Heart size={14} fill="var(--primary)" color="var(--primary)" /> for luxury stays

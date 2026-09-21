@@ -81,7 +81,7 @@ export default function Checkout({ booking, room, searchParams, onBack, onBookin
         amount: order.amount,
         currency: order.currency || 'INR',
         order_id: order.orderId,
-        name: 'Airhouse',
+        name: 'StayBook',
         description: `Booking for ${room.type}`,
         handler: async function (response) {
           try {
@@ -313,7 +313,7 @@ export default function Checkout({ booking, room, searchParams, onBack, onBookin
             </div>
             <div>
               <h4 style={{ fontWeight: 700, fontSize: '1.1rem' }}>{room.type}</h4>
-              <span className="text-sub" style={{ fontSize: '0.9rem' }}>Airhouse luxury selection</span>
+              <span className="text-sub" style={{ fontSize: '0.9rem' }}>StayBook luxury selection</span>
             </div>
           </div>
 

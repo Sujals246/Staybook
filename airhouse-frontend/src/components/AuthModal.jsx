@@ -40,7 +40,7 @@ export default function AuthModal({ isOpen, onClose }) {
 
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <h2 className="title-md" style={{ color: 'var(--primary)', marginBottom: '8px' }}>
-            {isLogin ? 'Welcome back to Airhouse' : 'Create your account'}
+            {isLogin ? 'Welcome back to StayBook' : 'Create your account'}
           </h2>
           <p className="text-sub">
             {isLogin ? 'Log in to manage your stays and bookings' : 'Join us today for exclusive stays'}

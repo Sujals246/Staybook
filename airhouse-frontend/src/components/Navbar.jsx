@@ -19,7 +19,7 @@ export default function Navbar({ onOpenAuth, onSetView, activeView, isDark, onTo
         {/* Logo */}
         <a href="#" className="logo" onClick={() => handleNavClick('search')}>
           <Home size={28} strokeWidth={2.5} />
-          <span>Airhouse</span>
+          <span>StayBook</span>
         </a>
 
         {/* Desktop Navigation Links */}

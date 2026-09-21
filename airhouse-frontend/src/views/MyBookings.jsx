@@ -86,7 +86,7 @@ export default function MyBookings() {
           <Calendar size={48} color="var(--text-light)" style={{ marginBottom: '16px' }} />
           <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '8px' }}>No stays booked yet</h3>
           <p className="text-sub" style={{ marginBottom: '20px' }}>
-            Explore our hotels and make your first booking with Airhouse!
+            Explore our hotels and make your first booking with StayBook!
           </p>
         </div>
       )}
