@@ -1,6 +1,6 @@
 # 🏨 StayBook
 
-### Full-Stack Hotel Booking & Reservation Platform
+### Full-Stack Hotel Booking & Payment Platform
 
 StayBook is a full-stack hotel booking platform built with **Java 17, Spring Boot, React, and MySQL**.
 
