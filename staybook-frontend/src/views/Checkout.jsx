@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar, User, ArrowRight, ArrowLeft, CreditCard, Sparkles, Plus, Trash2 } from 'lucide-react';
+import { Calendar, User, ArrowRight, ArrowLeft, CreditCard, Sparkles, Plus, Trash2, Download } from 'lucide-react';
 import { api } from '../api';
 import confetti from 'canvas-confetti';
 
@@ -194,29 +194,36 @@ export default function Checkout({ booking, room, searchParams, onBack, onBookin
           </div>
 
           <div style={{ display: 'flex', gap: '12px', marginTop: '32px' }}>
-            <a
-              href={api.downloadInvoiceUrl(successBooking.id)}
-              download
+            <button
+              onClick={async () => {
+                try {
+                  await api.downloadInvoice(successBooking.id);
+                } catch (err) {
+                  console.error('Invoice download failed:', err);
+                  alert(err.message || 'Failed to download invoice.');
+                }
+              }}
               className="btn btn-secondary"
               style={{ flex: 1 }}
             >
-              Download Invoice
-            </a>
-            <button
-              onClick={onBookingSuccess}
-              className="btn btn-primary"
-              style={{ flex: 1 }}
-            >
-              Go to My Bookings
+              <Download size={16} /> Download Invoice
             </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
-  return (
-    <div className="container section" style={{ textAlign: 'left', paddingTop: '24px' }}>
+                                <button
+                                  onClick={onBookingSuccess}
+                                  className="btn btn-primary"
+                                  style={{ flex: 1 }}
+                                >
+                                  Go to My Bookings
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+    return (
+      <div className="container section" style={{ textAlign: 'left', paddingTop: '24px' }}>
       <button onClick={onBack} className="btn btn-secondary btn-sm" style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '6px' }}>
         <ArrowLeft size={16} /> Back to Rooms
       </button>

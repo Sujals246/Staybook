@@ -38,8 +38,39 @@ async function request(endpoint, options = {}) {
   // Note: some responses might not be wrapped, let's fallback to the full JSON
   return Object.prototype.hasOwnProperty.call(json, 'data') ? json.data : json;
 }
+async function downloadInvoice(bookingId) {
+  const token = localStorage.getItem('token');
 
+  const response = await fetch(
+    `${BASE_URL}/bookings/${bookingId}/invoice`,
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Invoice download failed: ${response.status}`);
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `StayBook-Invoice-${bookingId}.pdf`;
+
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+}
 export const api = {
+downloadInvoice,
+
   // Authentication
   login: (email, password) => 
     request('/auth/login', {
@@ -131,7 +162,6 @@ export const api = {
     request(`/bookings/${bookingId}/status`),
   getMyBookings: () => request('/users/myBookings'),
   getMyPayments: () => request('/users/me/payments'),
-  downloadInvoiceUrl: (bookingId) => `${BASE_URL}/bookings/${bookingId}/invoice`,
 
   // Manager Operations
   manager: {

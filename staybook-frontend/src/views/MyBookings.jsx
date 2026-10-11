@@ -147,14 +147,20 @@ export default function MyBookings() {
               {/* Bottom Row: Actions */}
               <div style={bookingActionsStyle()}>
                 {b.bookingStatus === 'CONFIRMED' && (
-                  <a
-                    href={api.downloadInvoiceUrl(b.id)}
-                    download
+                  <button
+                    onClick={async () => {
+                      try {
+                        await api.downloadInvoice(b.id);
+                      } catch (err) {
+                        console.error('Invoice download failed:', err);
+                        alert(err.message || 'Failed to download invoice.');
+                      }
+                    }}
                     className="btn btn-secondary btn-sm"
                     style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                   >
                     <Download size={14} /> Download Invoice
-                  </a>
+                  </button>
                 )}
 
                 {b.bookingStatus !== 'CANCELLED' && b.bookingStatus !== 'EXPIRED' && (
