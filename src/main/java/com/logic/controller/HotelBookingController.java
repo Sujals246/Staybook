@@ -59,7 +59,7 @@ public class HotelBookingController {
         InvoiceDTO invoice = paymentService.buildInvoice(bookingId);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + invoice.getFileName() + "\"")
-                .contentType(MediaType.TEXT_PLAIN)
+                .contentType(MediaType.APPLICATION_PDF)
                 .body(invoice.getContent());
     }
 
