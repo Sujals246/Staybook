@@ -39,6 +39,14 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.stream.Collectors;
+import com.lowagie.text.Document;
+import com.lowagie.text.DocumentException;
+import com.lowagie.text.Element;
+import com.lowagie.text.Font;
+import com.lowagie.text.FontFactory;
+import com.lowagie.text.Paragraph;
+import com.lowagie.text.pdf.PdfWriter;
+import java.io.ByteArrayOutputStream;
 
 @Service
 @RequiredArgsConstructor
@@ -121,44 +129,101 @@ public class PaymentService {
     public InvoiceDTO buildInvoice(Long bookingId) {
         Booking booking = getOwnedBooking(bookingId);
 
-        log.info("Get kra ki booking id valid hai ya nhi");
         if (booking.getBookingStatus() != BookingStatus.CONFIRMED) {
-            throw new IllegalStateException("Invoice is available only after confirmed payment");
+            throw new IllegalStateException(
+                    "Invoice is available only after confirmed payment"
+            );
         }
 
-        Payment payment = paymentRepository.findByRazorpayOrderId(booking.getRazorpayOrderId())
-                .orElseThrow(() -> new ResourceNotFoundException("Payment not found for booking id: " + bookingId));
+        Payment payment = paymentRepository
+                .findByRazorpayOrderId(booking.getRazorpayOrderId())
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Payment not found for booking id: " + bookingId
+                        )
+                );
 
-        String content = """
-                Air Stay Receipt
-                =================
-                Booking ID: %s
-                Payment ID: %s
-                Order ID: %s
-                Hotel: %s
-                Room: %s
-                Check-in: %s
-                Check-out: %s
-                Rooms: %s
-                Amount: %s %s
-                Payment Status: %s
-                Paid At: %s
-                """.formatted(
-                booking.getId(),
-                nullToDash(payment.getRazorpayPaymentId()),
-                nullToDash(payment.getRazorpayOrderId()),
-                booking.getHotel().getName(),
-                booking.getRoom().getType(),
-                booking.getCheckInDate(),
-                booking.getCheckOutDate(),
-                booking.getRoomsCount(),
-                payment.getCurrency(),
-                payment.getAmount(),
-                payment.getPaymentStatus(),
-                payment.getUpdatedAt() == null ? "-" : payment.getUpdatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-        );
+        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
 
-        return new InvoiceDTO("booking-" + booking.getId() + "-receipt.txt", content.getBytes(StandardCharsets.UTF_8));
+            Document document = new Document();
+            PdfWriter.getInstance(document, outputStream);
+
+            document.open();
+
+            Font titleFont = FontFactory.getFont(
+                    FontFactory.HELVETICA_BOLD, 20
+            );
+
+            Font headingFont = FontFactory.getFont(
+                    FontFactory.HELVETICA_BOLD, 13
+            );
+
+            Font normalFont = FontFactory.getFont(
+                    FontFactory.HELVETICA, 11
+            );
+
+            Paragraph title = new Paragraph(
+                    "StayBook - Booking Invoice", titleFont
+            );
+            title.setAlignment(Element.ALIGN_CENTER);
+            document.add(title);
+
+            document.add(new Paragraph(" "));
+            document.add(new Paragraph("Booking Details", headingFont));
+            document.add(new Paragraph("Booking ID: " + booking.getId(), normalFont));
+            document.add(new Paragraph("Hotel: " + booking.getHotel().getName(), normalFont));
+            document.add(new Paragraph("Room: " + booking.getRoom().getType(), normalFont));
+            document.add(new Paragraph("Check-in: " + booking.getCheckInDate(), normalFont));
+            document.add(new Paragraph("Check-out: " + booking.getCheckOutDate(), normalFont));
+            document.add(new Paragraph("Rooms: " + booking.getRoomsCount(), normalFont));
+
+            document.add(new Paragraph(" "));
+            document.add(new Paragraph("Payment Details", headingFont));
+            document.add(new Paragraph(
+                    "Payment ID: " + nullToDash(payment.getRazorpayPaymentId()),
+                    normalFont
+            ));
+            document.add(new Paragraph(
+                    "Order ID: " + nullToDash(payment.getRazorpayOrderId()),
+                    normalFont
+            ));
+            document.add(new Paragraph(
+                    "Amount: " + payment.getCurrency() + " " + payment.getAmount(),
+                    normalFont
+            ));
+            document.add(new Paragraph(
+                    "Payment Status: " + payment.getPaymentStatus(),
+                    normalFont
+            ));
+            document.add(new Paragraph(
+                    "Paid At: " + (
+                            payment.getUpdatedAt() == null
+                                    ? "-"
+                                    : payment.getUpdatedAt().format(
+                                    DateTimeFormatter.ofPattern(
+                                            "yyyy-MM-dd HH:mm:ss"
+                                    )
+                            )
+                    ),
+                    normalFont
+            ));
+
+            document.close();
+
+            return new InvoiceDTO(
+                    "StayBook-Invoice-" + booking.getId() + ".pdf",
+                    outputStream.toByteArray()
+            );
+
+        } catch (DocumentException e) {
+            throw new IllegalStateException(
+                    "Failed to generate invoice PDF", e
+            );
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "Failed to build invoice", e
+            );
+        }
     }
 
     @Transactional
