@@ -17,6 +17,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
+import org.hibernate.Hibernate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -129,6 +130,7 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
+    @Transactional
     public Page<HotelPriceResponseDTO> searchHotelsWithPrices(HotelSearchRequest hotelSearchRequest) {
         log.info("Searching Hotels with prices for {} city, from {} to {}",
                 hotelSearchRequest.getCity(), hotelSearchRequest.getStartDate(), hotelSearchRequest.getEndDate());
@@ -147,6 +149,8 @@ public class InventoryServiceImpl implements InventoryService {
                 pageable
         ).map(hotelPriceDTO -> {
             Hotel hotel = hotelPriceDTO.getHotel();
+            Hibernate.initialize(hotel.getPhotos());
+            Hibernate.initialize(hotel.getAmenities());
             return new HotelPriceResponseDTO(
                     hotel.getId(),
                     hotel.getName(),

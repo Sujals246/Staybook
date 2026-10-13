@@ -102,21 +102,37 @@ public class HotelServiceImpl implements HotelService{
     }
 
     @Override
+    @Transactional
     public HotelInfoDTO getHotelInfoById(Long hotelId) {
         Hotel hotel = hotelRepository
                 .findById(hotelId)
-                .orElseThrow(() -> new ResourceNotFoundException("Hotel not found with ID: "+hotelId));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Hotel not found with ID: " + hotelId
+                ));
+
+        // Initialize rooms and their lazy-loaded collections
+        org.hibernate.Hibernate.initialize(hotel.getRooms());
+
+        hotel.getRooms().forEach(room -> {
+            org.hibernate.Hibernate.initialize(room.getAmenities());
+            org.hibernate.Hibernate.initialize(room.getPhotos());
+        });
 
         List<RoomPriceResponseDTO> rooms = hotel.getRooms()
                 .stream()
-                .map((element) -> modelMapper.map(element, RoomPriceResponseDTO.class))
+                .map(room -> new RoomPriceResponseDTO(
+                        room.getId(),
+                        room.getType(),
+                        room.getPhotos().toArray(new String[0]),
+                        room.getAmenities().toArray(new String[0]),
+                        room.getBasePrice().doubleValue()
+                ))
                 .toList();
-
-        // hotel ke data ko DTO Map krdunga
         return new HotelInfoDTO(modelMapper.map(hotel, HotelDTO.class), rooms);
     }
 
     @Override
+    @Transactional
     public HotelInfoDTO getHotelInfoById(Long hotelId, HotelInfoRequestDTO hotelInfoRequestDTO) {
         Hotel hotel = hotelRepository
                 .findById(hotelId)

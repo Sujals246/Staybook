@@ -64,6 +64,9 @@ public class WebSecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
 
         configuration.setAllowedOrigins(List.of(
+                "http://localhost:5173",
+                "http://localhost:5174",
+                "http://localhost:5175",
                 "https://staybook-eta.vercel.app",
                 "https://staybook-ivm8tmd1t-sujal-4e62.vercel.app"
         ));
