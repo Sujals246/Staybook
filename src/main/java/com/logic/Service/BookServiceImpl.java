@@ -148,6 +148,15 @@ public class BookServiceImpl implements BookingService {
                         new ResourceNotFoundException(
                                 "Booking not found with id: " + bookingId));
 
+        User currentUser = getCurrentUser();
+
+        if (booking.getUser() == null
+                || !currentUser.getId().equals(booking.getUser().getId())) {
+            throw new UnAuthorisedException(
+                    "You are not authorized to modify this booking"
+            );
+        }
+
         if (hasBookingExpired(booking)) {
             throw new IllegalStateException("Booking has already expired");
         }
@@ -161,7 +170,7 @@ public class BookServiceImpl implements BookingService {
 
             Guest guest = modelMapper.map(guestDto, Guest.class);
 
-            guest.setUser(getCurrentUser());
+            guest.setUser(currentUser);
 
             guestRepository.save(guest);
 
@@ -348,20 +357,29 @@ public class BookServiceImpl implements BookingService {
     }
 
     private boolean isValidRazorpaySignature(String orderId, String paymentId, String signature) {
-        if (orderId != null && orderId.contains("mock")) {
-            return true;
+        if (orderId == null || orderId.isBlank()
+                || paymentId == null || paymentId.isBlank()
+                || signature == null || signature.isBlank()) {
+            return false;
         }
+
         try {
-            String expectedSignature = hmacSha256(orderId + "|" + paymentId, razorpayKeySecret);
+            String expectedSignature = hmacSha256(
+                    orderId + "|" + paymentId,
+                    razorpayKeySecret
+            );
+
             return MessageDigest.isEqual(
                     expectedSignature.getBytes(StandardCharsets.UTF_8),
                     signature.getBytes(StandardCharsets.UTF_8)
             );
         } catch (Exception e) {
-            throw new RuntimeException("Could not verify Razorpay payment signature", e);
+            throw new IllegalStateException(
+                    "Could not verify Razorpay payment signature",
+                    e
+            );
         }
     }
-
     private String hmacSha256(String payload, String secret) throws Exception {
         Mac mac = Mac.getInstance("HmacSHA256");
         mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
@@ -376,14 +394,16 @@ public class BookServiceImpl implements BookingService {
     }
 
     private void validateRazorpayPayment(Booking booking, BookingPaymentVerifyRequestDTO paymentVerifyRequest) {
-        if (paymentVerifyRequest.getRazorpayOrderId() != null && paymentVerifyRequest.getRazorpayOrderId().contains("mock")) {
-            return;
-        }
         try {
-            com.razorpay.Payment razorpayPayment = razorpayClient.payments.fetch(paymentVerifyRequest.getRazorpayPaymentId());
+            com.razorpay.Payment razorpayPayment =
+                    razorpayClient.payments.fetch(
+                            paymentVerifyRequest.getRazorpayPaymentId()
+                    );
+
             String razorpayOrderId = getRazorpayString(razorpayPayment, "order_id");
             String status = getRazorpayString(razorpayPayment, "status");
             Long razorpayAmount = getRazorpayLong(razorpayPayment, "amount");
+
             long expectedAmount = booking.getAmount()
                     .multiply(BigDecimal.valueOf(100))
                     .setScale(0, RoundingMode.HALF_UP)
@@ -393,8 +413,10 @@ public class BookServiceImpl implements BookingService {
                 throw new IllegalStateException("Razorpay payment does not belong to this order");
             }
 
-            if (!"captured".equalsIgnoreCase(status) && !"authorized".equalsIgnoreCase(status)) {
-                throw new IllegalStateException("Razorpay payment is not successful. Current status: " + status);
+            if (!"captured".equalsIgnoreCase(status)) {
+                throw new IllegalStateException(
+                        "Razorpay payment is not captured. Current status: " + status
+                );
             }
 
             if (razorpayAmount == null || razorpayAmount != expectedAmount) {

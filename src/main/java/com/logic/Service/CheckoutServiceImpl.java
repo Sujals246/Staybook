@@ -45,7 +45,7 @@ public class CheckoutServiceImpl implements CheckoutService {
 
         try {
 
-                // to string
+            // to string
             log.info("Booking: {}", booking);
             log.info("Amount: {}", booking.getAmount());
 
@@ -81,28 +81,16 @@ public class CheckoutServiceImpl implements CheckoutService {
             log.info("Razorpay order created for booking ID: {}", booking.getId());
             return new BookingPaymentInitResponseDTO(razorpayKeyId, orderId, booking.getId(), amountInPaise, currency, businessName, description);
         } catch (RazorpayException e) {
-            log.warn("Could not create Razorpay order due to: {}. Falling back to mock order simulation.", e.getMessage());
-            String orderId = "order_mock_" + System.currentTimeMillis();
-            booking.setRazorpayOrderId(orderId);
-            bookingRepository.save(booking);
-            paymentRepository.save(Payment.builder()
-                    .booking(booking)
-                    .amount(booking.getAmount())
-                    .currency(currency)
-                    .razorpayOrderId(orderId)
-                    .paymentStatus(PaymentStatus.PENDING)
-                    .build());
-            return new BookingPaymentInitResponseDTO(
-                    "rzp_test_mockkeyid12345",
-                    orderId,
+            log.error(
+                    "Failed to create Razorpay order for booking ID: {}",
                     booking.getId(),
-                    amountInPaise,
-                    currency,
-                    businessName + " (Mock)",
-                    description
+                    e
+            );
+
+            throw new IllegalStateException(
+                    "Unable to initiate payment. Please try again later.",
+                    e
             );
         }
     }
-
-
 }
